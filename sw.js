@@ -2,7 +2,7 @@
    The whole app shell, including the bundled pixel fonts, is precached, so
    it works fully offline and makes no third-party requests.
    Bump CACHE_VERSION whenever any shell file changes. */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SHELL_CACHE = 'pitstop-shell-' + CACHE_VERSION;
 const SHELL = [
   './',
