@@ -1,0 +1,2707 @@
+<!DOCTYPE html>
+<!-- Pit Stop Study Timer · MIT License · Copyright (c) 2026 Matteo Frediani · see LICENSE -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pit Stop Study Timer</title>
+<meta name="theme-color" content="#19191e">
+<meta name="description" content="A pixel-art study timer with racing-style pacing: study laps, pit-stop breaks and a day/night cycle. Free, offline, no tracking.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pit Stop">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- Fonts bundled locally (no Google Fonts request): Press Start 2P and VT323, both SIL Open Font License 1.1. -->
+<style>
+@font-face{font-family:'Press Start 2P';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/press-start-2p-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'Press Start 2P';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/press-start-2p-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;}
+@font-face{font-family:'VT323';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/vt323-latin-400-normal.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}
+@font-face{font-family:'VT323';font-style:normal;font-weight:400;font-display:swap;src:url(fonts/vt323-latin-ext-400-normal.woff2) format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;}
+</style>
+<style>
+  /* ==========================================================================
+     PIT STOP STUDY TIMER — styles
+     Sections: 1 Theme · 2 Widget shell · 3 Track scenery · 4 Car & grid ·
+               5 Status & controls · 6 Settings panel · 7 Overlays & notices ·
+               8 Stats panel · 9 Accessibility & touch · 10 Installed app
+     Pixel look: 'Press Start 2P' for labels, 'VT323' for body text.
+     ========================================================================== */
+
+  /* ---------- 1. THEME ---------- */
+  :root{
+    --accent:#ffcc00;          /* yellow: highlights, active states, road dashes */
+    --red:#d61a18;
+    --white:#f4f4f0;
+    --asphalt:#26262c;
+    --asphalt-dark:#19191e;    /* settings / stats panel background */
+    --panel:#131316;
+    --panel-border:#34343c;
+    --text:#f4f4f0;
+    --text-dim:#9a9aa5;
+    /* driven from JS by the day/night cycle (see applyDaylight) */
+    --sky-top:#4fb3f0;
+    --sky-bottom:#bfe6ff;
+    --cloud-opacity:1;
+    --window-color:#24405c;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; padding:0;
+    width:100%; height:100%;
+    background:transparent;
+    font-family:'VT323', monospace;
+    -webkit-font-smoothing:none;
+    overflow:hidden;
+    user-select:none;
+  }
+
+  /* ---------- 2. WIDGET SHELL ---------- */
+  .widget{
+    width:100%;
+    max-width:300px;
+    margin:8px auto;
+    background:var(--panel);
+    border:3px solid var(--panel-border);
+    border-radius:9px;
+    box-shadow:0 8px 22px rgba(0,0,0,.55), inset 0 0 0 2px #000;
+    overflow:hidden;
+    position:relative;
+  }
+  .titlebar{
+    position:absolute; top:0; left:0; right:0; z-index:10;
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    padding:4px 5px;
+  }
+  .titlebar .btns{
+    display:flex; gap:5px;
+    background:rgba(255,255,255,.28);
+    border-radius:5px;
+    padding:3px 4px;
+  }
+  .iconbtn{
+    width:17px; height:17px;
+    background:#111;
+    border:2px solid #000;
+    color:#fff;
+    display:flex; align-items:center; justify-content:center;
+    font-size:9px;
+    cursor:pointer;
+    border-radius:3px;
+  }
+  .iconbtn:hover{ background:#333; }
+  .iconbtn:active{ transform:translateY(1px); }
+  .iconbtn.close{ background:#4a0d0d; }
+  .iconbtn.close:hover{ background:#7a1414; }
+
+  /* ---------- 3. TRACK SCENERY ----------
+     A flat, full-width strip. Depth comes from haze (the road lightens toward
+     its far edge) and parallax: the far curb uses a small tile and scrolls
+     slowly, the near curb a big tile and scrolls fast, the dashes in between.
+     Every scrolling layer is a repeating background whose position is
+     animated by one full tile; the speeds are mirrored in JS (NEAR_CURB_SPEED)
+     because the grid/finish line must move at the near curb's speed. */
+  .track-wrap{
+    position:relative;
+    height:81px;
+    overflow:hidden;
+    background:linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 100%);
+    border-bottom:3px solid #000;
+  }
+  .clouds{
+    position:absolute; top:0; left:0; right:0; bottom:0;
+    opacity:var(--cloud-opacity, 1);
+    transition:opacity 1.2s linear;
+    background-image:
+      radial-gradient(ellipse 15px 6px at 10% 35%, rgba(255,255,255,.85), rgba(255,255,255,.4) 45%, rgba(255,255,255,0) 80%),
+      radial-gradient(ellipse 11px 5px at 17% 12%, rgba(255,255,255,.8), rgba(255,255,255,.35) 45%, rgba(255,255,255,0) 78%),
+      radial-gradient(ellipse 10px 4px at 3% 42%, rgba(255,255,255,.75), rgba(255,255,255,.3) 45%, rgba(255,255,255,0) 78%),
+
+      radial-gradient(ellipse 22px 7px at 46% 16%, rgba(255,255,255,.85), rgba(255,255,255,.4) 42%, rgba(255,255,255,0) 80%),
+      radial-gradient(ellipse 14px 6px at 38% 36%, rgba(255,255,255,.78), rgba(255,255,255,.32) 45%, rgba(255,255,255,0) 78%),
+      radial-gradient(ellipse 13px 5px at 56% 34%, rgba(255,255,255,.75), rgba(255,255,255,.3) 45%, rgba(255,255,255,0) 78%),
+      radial-gradient(ellipse 9px 4px at 33% 5%, rgba(255,255,255,.7), rgba(255,255,255,.25) 45%, rgba(255,255,255,0) 78%),
+
+      radial-gradient(ellipse 17px 6px at 84% 25%, rgba(255,255,255,.82), rgba(255,255,255,.38) 45%, rgba(255,255,255,0) 80%),
+      radial-gradient(ellipse 11px 4px at 92% 38%, rgba(255,255,255,.75), rgba(255,255,255,.3) 45%, rgba(255,255,255,0) 78%),
+      radial-gradient(ellipse 9px 4px at 76% 9%, rgba(255,255,255,.7), rgba(255,255,255,.25) 45%, rgba(255,255,255,0) 78%);
+  }
+
+  /* grass strip (behind the far curb) */
+  .grass{
+    position:absolute; left:0; right:0; top:30px; height:6px;
+    background-image: repeating-linear-gradient(90deg, #2f7d32 0px, #2f7d32 3px, #3f9142 3px, #3f9142 6px);
+    background-size:6px 100%;
+    animation: scrollGrass 0.3s linear infinite;
+  }
+  /* Sporadic bushes/trees growing out of the grass: six blobs of different
+     sizes at hand-placed, uneven offsets inside one wide tile (160px), so the
+     repeat doesn't read as mechanical. */
+  .vegetation{
+    position:absolute; left:0; right:0; top:16px; height:20px;
+    background-repeat:repeat-x;
+    background-size:160px 20px;
+    background-image:
+      radial-gradient(ellipse 8px 6.5px  at 14px  16px, #1f5c22 55%, transparent 74%),
+      radial-gradient(ellipse 5.5px 11px at 38px  9px,  #16481c 55%, transparent 74%),
+      radial-gradient(ellipse 10px 8px   at 66px  15px, #2d6e30 55%, transparent 74%),
+      radial-gradient(ellipse 4px 3.5px  at 92px  17px, #1f5c22 55%, transparent 74%),
+      radial-gradient(ellipse 9px 7.5px  at 114px 16px, #16481c 55%, transparent 74%),
+      radial-gradient(ellipse 5px 9.5px  at 143px 10px, #2d6e30 55%, transparent 74%);
+    animation: scrollVeg 5.95s linear infinite;
+  }
+  /* A tiny house that drifts past once in a long while (420px tile). Built
+     from hard-edged rectangles: each linear-gradient is transparent → color →
+     transparent at exact px stops, stacked as roof / body / window rows. */
+  .house-roof, .house-body, .house-window{
+    position:absolute; left:0; right:0;
+    background-repeat:repeat-x;
+    background-size:420px 100%;
+    animation: scrollHouses 15.6s linear infinite;
+  }
+  .house-roof{
+    top:20px; height:4px;
+    background-image: linear-gradient(90deg,
+      transparent 0px, transparent 203px,
+      #7a2e20 203px, #7a2e20 217px,
+      transparent 217px, transparent 420px);
+  }
+  .house-body{
+    top:24px; height:6px;
+    background-image: linear-gradient(90deg,
+      transparent 0px, transparent 205px,
+      #ecd9b8 205px, #ecd9b8 215px,
+      transparent 215px, transparent 420px);
+  }
+  .house-window{
+    top:26px; height:2px;
+    background-image: linear-gradient(90deg,
+      transparent 0px, transparent 208px,
+      var(--window-color) 208px, var(--window-color) 210px,
+      transparent 210px, transparent 420px);
+  }
+
+  .curb{
+    position:absolute; left:0; right:0;
+    background-repeat:repeat-x;
+  }
+  /* far curb: thin, small tile, slow */
+  .curb.top{
+    top:36px; height:4px;
+    background-image: repeating-linear-gradient(90deg, var(--red) 0px, var(--red) 3.5px, var(--white) 3.5px, var(--white) 7px);
+    background-size:7px 100%;
+    animation: scrollFar 0.26s linear infinite;
+  }
+  /* near curb: thick, big tile, fast */
+  .curb.bottom{
+    bottom:0; height:6px;
+    background-image: repeating-linear-gradient(90deg, var(--red) 0px, var(--red) 6px, var(--white) 6px, var(--white) 12px);
+    background-size:12px 100%;
+    animation: scrollNear 0.3s linear infinite;
+  }
+  .road{
+    position:absolute; left:0; right:0; top:40px; bottom:0;
+    background-color:var(--asphalt);
+    background-image:
+      linear-gradient(180deg, rgba(191,230,255,.3) 0%, rgba(191,230,255,0) 45%),
+      repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 2px, transparent 2px, transparent 6px);
+    overflow:hidden;
+  }
+  .road-dash{
+    position:absolute; left:0; right:0; top:57.5px; height:2px;
+    background-image: repeating-linear-gradient(90deg, var(--accent) 0px, var(--accent) 4px, transparent 4px, transparent 9px);
+    background-size:9px 100%;
+    animation: scrollMid 0.3s linear infinite;
+  }
+
+  @keyframes scrollGrass { from{ background-position:0 0; } to{ background-position:-6px 0; } }
+  @keyframes scrollVeg   { from{ background-position:0 0; } to{ background-position:-160px 0; } }
+  @keyframes scrollHouses{ from{ background-position:0 0; } to{ background-position:-420px 0; } }
+  @keyframes scrollFar   { from{ background-position:0 0; } to{ background-position:-7px 0; } }
+  @keyframes scrollMid   { from{ background-position:0 0; } to{ background-position:-9px 0; } }
+  @keyframes scrollNear  { from{ background-position:0 0; } to{ background-position:-12px 0; } }
+
+  /* JS toggles .paused on .track-wrap whenever nothing should be moving
+     (timer paused, or during the pit stop). */
+  .paused .curb, .paused .road-dash, .paused .grass, .paused .vegetation,
+  .paused .house-roof, .paused .house-body, .paused .house-window,
+  .paused .grid-formation.launching, .paused .grid-formation.returning,
+  .paused .car-inner.idle, .paused .puff{
+    animation-play-state: paused;
+  }
+
+  /* "Background" setting off: no sky details, scenery or grass — just a plain
+     translucent gray behind the road. */
+  .track-wrap.no-bg{ background:rgba(58,58,66,.55); }
+  .track-wrap.no-bg .clouds, .track-wrap.no-bg .house-roof, .track-wrap.no-bg .house-body,
+  .track-wrap.no-bg .house-window, .track-wrap.no-bg .vegetation, .track-wrap.no-bg .grass{ display:none; }
+  .track-wrap.no-bg .road{
+    background-image: repeating-linear-gradient(90deg, rgba(255,255,255,0.025) 0px, rgba(255,255,255,0.025) 2px, transparent 2px, transparent 6px);
+  }
+
+  /* ---------- 4. CAR & STARTING GRID ---------- */
+  .car{
+    position:absolute;
+    bottom:13px;
+    z-index:5;
+    transition: left 2s cubic-bezier(.4,0,.2,1);   /* the launch */
+  }
+  .car.no-anim{ transition:none; }
+  .car-inner{ position:relative; width:100%; height:100%; }
+  .car-inner img{
+    display:block;
+    width:100%; height:100%;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+    filter:drop-shadow(0 2px 1px rgba(0,0,0,.55));
+    transition:filter .25s ease;
+  }
+  .car-inner.idle{ animation: bob 0.85s ease-in-out infinite; }
+  @keyframes bob{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-1.5px);} }
+
+  /* The whole starting grid is one rigid container (10 boxes + a smaller
+     second row, mostly off-screen to the left) that carries the scroll
+     animation. It's paint on the tarmac, so it scrolls away like the track.
+     Durations/distances come from JS (--grid-retreat-dist, --grid-entry-dist,
+     animation-duration) so they match NEAR_CURB_SPEED. */
+  .grid-formation{
+    position:absolute;
+    bottom:1px;
+    --grid-retreat-dist: 0px;
+    pointer-events:none;
+    z-index:4;
+  }
+  /* launch: the formation retreats to the left */
+  .grid-formation.launching{
+    animation-name: gridRetreat;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+  /* end of lap: the formation approaches from the right (same direction as
+     everything else on the track), queued far enough off-screen that its
+     entire length enters in order, and lands exactly when the countdown ends */
+  .grid-formation.returning{
+    animation-name: gridEnter;
+    animation-timing-function: linear;
+    animation-fill-mode: forwards;
+  }
+  @keyframes gridRetreat{
+    from{ transform: translateX(0); }
+    to{ transform: translateX(var(--grid-retreat-dist)); }
+  }
+  @keyframes gridEnter{
+    from{ transform: translateX(var(--grid-entry-dist)); }
+    to{ transform: translateX(0); }
+  }
+  .grid-box{
+    position:absolute;
+    bottom:0; width:90px; height:31.5px;   /* width = GRID_BOX_W in JS */
+  }
+  .grid-box svg{ display:block; width:100%; height:100%; overflow:visible; }
+  .grid-box.row2{
+    bottom:20px;
+    transform: scale(.6);
+    transform-origin: 0% 100%;
+    opacity:.85;
+  }
+  /* thin white line across the road; the car's lap-count collision test uses
+     exactly this element's box */
+  .finish-line{
+    position:absolute;
+    bottom:5px; width:3px; height:33px;
+    background:#f4f4f4;
+  }
+
+  /* exhaust smoke behind the car */
+  .exhaust{
+    position:absolute;
+    left:2px;
+    bottom:5px;
+    width:1px; height:1px;
+    pointer-events:none;
+  }
+  .exhaust.off .puff{ display:none; }   /* before the first launch: a paused puff would still show its 0% frame */
+  .puff{
+    position:absolute;
+    left:0; bottom:0;
+    width:11px; height:7px;
+    border-radius:50%;
+    background:radial-gradient(circle, rgba(235,235,240,.85) 0%, rgba(235,235,240,.4) 45%, rgba(235,235,240,0) 75%);
+    opacity:0;
+    animation: puffDrift 0.9s linear infinite;
+    filter:blur(0.4px);
+  }
+  .puff.p2{ animation-delay:.22s; bottom:2px; }
+  .puff.p3{ animation-delay:.44s; bottom:-2px; }
+  .puff.p4{ animation-delay:.66s; bottom:1px; }
+  /* launch-burst puffs: shown only after the launch (.burst) and looping a
+     limited, staggered number of times, so the cloud tapers off gradually */
+  .puff.extra{ display:none; animation-fill-mode:forwards; }
+  .exhaust.burst .puff.extra{ display:block; }
+  .puff.e1{ bottom:3px;  animation-delay:0s;   animation-iteration-count:4; }
+  .puff.e2{ bottom:-1px; animation-delay:.15s; animation-iteration-count:3; }
+  .puff.e3{ bottom:4px;  animation-delay:.3s;  animation-iteration-count:2; }
+  .puff.e4{ bottom:-3px; animation-delay:.45s; animation-iteration-count:2; }
+  @keyframes puffDrift{
+    0%{ transform:translate(0,0) scale(.5); opacity:.7; }
+    15%{ opacity:.65; }
+    100%{ transform:translate(-34px,-7px) scale(1.9); opacity:0; }
+  }
+
+  /* ---------- 5. STATUS & CONTROLS ---------- */
+  .status{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:6px 8px 1px;
+    background:var(--panel);
+  }
+  .status-left{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:3px;
+  }
+  .phase{
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    padding:3px 5px;
+    border-radius:4px;
+    color:#000;
+    background:var(--accent);
+    letter-spacing:1px;
+    cursor:pointer;
+    max-width:135px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    outline:none;
+  }
+  .phase:hover{ box-shadow:0 0 0 2px #fff inset; }
+  .phase.editing{ background:#fff; white-space:normal; cursor:text; }
+  .phase.pit{ background:#7dd3fc; }
+  .lap{
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    color:var(--text-dim);
+    letter-spacing:1px;
+    padding-left:2px;
+  }
+  .lap.flash{ animation: lapFlash 1s ease-out; }   /* green flash when a lap is counted */
+  .lap.goal-done{ color:#4cff7a; }
+  @keyframes lapFlash{
+    0%{ color:#5cff6b; text-shadow:0 0 6px rgba(92,255,107,.9), 0 0 2px rgba(92,255,107,.9); }
+    100%{ color:var(--text-dim); text-shadow:none; }
+  }
+  .time{
+    font-family:'Press Start 2P', monospace;
+    font-size:18px;
+    color:var(--text);
+    text-shadow:2px 2px 0 #000;
+  }
+
+  .controls{
+    display:flex;
+    gap:6px;
+    padding:7px 8px 10px;
+  }
+  .ctrl-btn{
+    flex:1;
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    padding:7px 4px;
+    background:var(--red);
+    border:2px solid #000;
+    border-bottom:4px solid #6b0300;
+    color:#fff;
+    border-radius:5px;
+    cursor:pointer;
+    letter-spacing:1px;
+  }
+  .ctrl-btn:active{ border-bottom-width:2px; transform:translateY(2px); }
+  .ctrl-btn.secondary{ background:#3a3a44; border-bottom-color:#1c1c22; }
+  .ctrl-btn.tertiary{ background:#1c1c22; border-bottom-color:#000; flex:0 0 36px; }
+
+  /* Progress ring around START/PAUSE. It's a sibling SVG (not a child) because
+     the button's textContent is rewritten from JS; JS sizes it to the button. */
+  .play-wrap{
+    position:relative;
+    flex:1;
+    display:flex;
+  }
+  .play-wrap #playBtn{ flex:1; width:100%; }
+  .play-progress{
+    position:absolute;
+    inset:-4px;
+    pointer-events:none;
+    overflow:visible;
+  }
+  .play-progress-rect{
+    stroke:var(--accent);
+    stroke-width:3;
+    transition:stroke-dashoffset .25s linear, stroke .3s, opacity .3s;
+    filter:drop-shadow(0 0 2px rgba(255,204,0,.75));
+  }
+  .play-progress-rect.pit{
+    stroke:#7dd3fc;
+    filter:drop-shadow(0 0 2px rgba(125,211,252,.75));
+  }
+  .play-progress-rect.idle{ opacity:.4; }
+
+  /* ---------- 6. SETTINGS PANEL ---------- */
+  /* Shared "chunky pixel button" look. Variants below only change colors. */
+  .toggle-btn, .mode-btn, .part-tab, .info-btn, .danger-btn, .chip button{
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    cursor:pointer;
+  }
+  .settings, .statspanel{
+    display:none;
+    padding:9px;
+    background:var(--asphalt-dark);
+    border-top:3px solid #000;
+    /* keeps the widget close to its original height: the content scrolls
+       inside (wheel, touch, or the pixel scrollbar below) */
+    max-height:215px;
+    overflow-y:auto;
+    overflow-x:hidden;
+    overscroll-behavior:contain;
+    scrollbar-width:thin;
+    scrollbar-color:var(--accent) #0e0e12;
+  }
+  .settings.open, .statspanel.open{ display:block; }
+  .settings::-webkit-scrollbar, .statspanel::-webkit-scrollbar{ width:9px; }
+  .settings::-webkit-scrollbar-track, .statspanel::-webkit-scrollbar-track{
+    background:#0e0e12; border-left:2px solid #000;
+  }
+  .settings::-webkit-scrollbar-thumb, .statspanel::-webkit-scrollbar-thumb{
+    background:var(--accent); border:2px solid #000; border-radius:3px;
+  }
+  .settings::-webkit-scrollbar-thumb:hover, .statspanel::-webkit-scrollbar-thumb:hover{ background:#ffe066; }
+
+  .field{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:7px;
+    font-size:15px;
+    color:var(--text);
+  }
+  .field label{ display:flex; align-items:center; gap:6px; }
+  .field-right{ display:flex; align-items:center; gap:6px; }
+  .field input{
+    width:52px;
+    font-family:'VT323', monospace;
+    font-size:17px;
+    text-align:center;
+    background:#0e0e12;
+    color:var(--accent);
+    border:2px solid var(--panel-border);
+    border-radius:4px;
+    padding:2px;
+  }
+  .color-field{ margin-bottom:4px; }
+  .settings .hint{
+    color:var(--text-dim);
+    font-size:12px;
+    margin-bottom:7px;
+    line-height:1.3;
+  }
+  .settings .section-title{
+    font-family:'Press Start 2P', monospace; font-size:8px; letter-spacing:1px;
+    color:var(--text-dim); margin:10px 0 6px; padding-top:8px; border-top:1px dashed #2c2c34;
+  }
+  .about{
+    font-family:'VT323', monospace; font-size:14px; line-height:1.3;
+    color:rgba(244,244,240,.62); text-align:center; margin:10px 0 12px;
+  }
+
+  /* race modes */
+  .modes{ display:grid; grid-template-columns:1fr 1fr; gap:5px; width:100%; }
+  .mode-btn{
+    line-height:1.5;
+    padding:5px 2px; background:#3a3a44; color:#cfcfd6;
+    border:2px solid #000; border-bottom:3px solid #1c1c22; border-radius:4px;
+    text-align:center;
+  }
+  .mode-btn small{ display:block; font-size:8px; margin-top:2px; }
+  .mode-btn.active{ background:var(--accent); color:#000; border-bottom-color:#a37e00; }
+  .mode-btn:active{ border-bottom-width:1px; transform:translateY(2px); }
+  .custom-fields{ display:none; }
+  .custom-fields.show{ display:block; }
+
+  /* ON/OFF toggles (also used for small action buttons) */
+  .toggle-btn{
+    padding:5px 10px;
+    background:var(--accent);
+    color:#000;
+    border:2px solid #000;
+    border-bottom:3px solid #a37e00;
+    border-radius:4px;
+    letter-spacing:1px;
+  }
+  .toggle-btn.off{
+    background:#3a3a44;
+    color:#cfcfd6;
+    border-bottom-color:#1c1c22;
+  }
+  .toggle-btn:active{ border-bottom-width:1px; transform:translateY(2px); }
+
+  /* round "i" button that opens the shortcut cheat sheet (lifted above the overlay so it can also close it) */
+  .info-btn{
+    position:relative; z-index:40;
+    width:20px; height:20px; padding:0;
+    background:#3a3a44; color:#fff;
+    border:2px solid #000; border-bottom:3px solid #1c1c22;
+    border-radius:50%;
+  }
+  .info-btn.active{ background:var(--accent); color:#000; border-bottom-color:#a37e00; }
+  .info-btn:active{ border-bottom-width:1px; transform:translateY(2px); }
+
+  /* livery picker */
+  .part-tabs{ display:flex; gap:5px; margin-bottom:8px; }
+  .part-tab{
+    flex:1;
+    padding:6px 2px;
+    background:#3a3a44; color:#cfcfd6;
+    border:2px solid #000; border-bottom:3px solid #1c1c22;
+    border-radius:4px;
+    letter-spacing:1px;
+  }
+  .part-tab.active{ background:var(--accent); color:#000; border-bottom-color:#a37e00; }
+  .part-tab:active{ border-bottom-width:1px; transform:translateY(2px); }
+  .swatch-row{
+    display:grid;
+    grid-template-columns:repeat(6, 22px);
+    justify-content:space-between;
+    row-gap:8px;
+    margin-bottom:10px;
+  }
+  .swatch{
+    width:22px; height:22px;
+    border-radius:50%;
+    border:2px solid #000;
+    cursor:pointer;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.15);
+  }
+  .swatch.active{ box-shadow:0 0 0 2px var(--panel), 0 0 0 4px var(--accent); }
+
+  /* volume slider (next to the Sound cues toggle) */
+  .vol-slider{
+    -webkit-appearance:none; appearance:none;
+    width:64px; height:6px; padding:0; margin:0;
+    background:rgba(255,255,255,.14); border:none; border-radius:3px; outline:none; cursor:pointer;
+  }
+  .vol-slider.hide{ display:none; }
+  .vol-slider::-webkit-slider-thumb{
+    -webkit-appearance:none; width:10px; height:14px;
+    background:var(--accent); border:2px solid #000; border-radius:2px;
+  }
+  .vol-slider::-moz-range-thumb{
+    width:6px; height:10px; background:var(--accent); border:2px solid #000; border-radius:2px;
+  }
+  .vol-slider:focus-visible{ box-shadow:0 0 0 2px rgba(255,204,0,.6); }
+
+  /* long break: indented sub-options under the toggle */
+  .long-box{
+    display:none; margin:2px 0 6px 6px; padding:2px 0 2px 10px;
+    border-left:2px solid rgba(255,204,0,.35);
+  }
+  .long-box.show{ display:block; }
+  .long-box .field label{ font-size:.82em; }
+  .stepper{ display:flex; align-items:center; gap:6px; }
+  .step-btn{
+    width:20px; height:20px; padding:0; line-height:1;
+    font-family:'Press Start 2P', monospace; font-size:9px;
+    background:rgba(255,255,255,.06); color:rgba(244,244,240,.7);
+    border:2px solid rgba(255,255,255,.18); border-bottom:3px solid rgba(255,255,255,.18);
+    border-radius:4px; cursor:pointer;
+  }
+  .step-btn:hover{ color:#fff; background:rgba(255,255,255,.12); }
+  .step-btn:active{ border-bottom-width:1px; transform:translateY(2px); }
+  .step-val{
+    min-width:38px; text-align:center;
+    font-family:'Press Start 2P', monospace; font-size:9px; color:rgba(255,204,0,.9);
+  }
+
+  /* presets & backup */
+  .preset-list{ display:flex; flex-wrap:wrap; gap:5px; margin-bottom:6px; }
+  .chip{ display:inline-flex; border:2px solid #000; border-radius:4px; overflow:hidden; background:#3a3a44; }
+  .chip button{
+    letter-spacing:1px;
+    background:transparent; color:#cfcfd6; border:0; padding:6px 6px;
+  }
+  .chip .chip-del{ border-left:2px solid #000; padding:6px 5px; color:#9a9aa4; }
+  .chip.active{ background:var(--accent); }
+  .chip.active button{ color:#000; }
+  .chip .chip-del.confirm{ background:#7a1414; color:#fff; }
+  .preset-save{ display:flex; gap:6px; margin-bottom:4px; }
+  .preset-save input{
+    flex:1; min-width:0; font-family:'VT323', monospace; font-size:16px;
+    background:#0e0e12; color:var(--accent);
+    border:2px solid var(--panel-border); border-radius:4px; padding:2px 6px;
+  }
+  .msg-line{ font-size:13px; color:var(--text-dim); min-height:15px; margin-bottom:5px; line-height:1.2; }
+  .msg-line.err{ color:#ff8a8a; }
+  .msg-line.ok{ color:#7dff8a; }
+  .backup-confirm{ display:none; align-items:center; gap:6px; flex-wrap:wrap; font-size:13px; color:var(--text); margin-bottom:7px; }
+  .backup-confirm.open{ display:flex; }
+  .backup-confirm span{ flex:1 1 100%; line-height:1.2; }
+
+  /* SAVE / RESET SETTINGS buttons */
+  .settings .save-btn{
+    width:100%;
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    padding:7px;
+    background:var(--accent);
+    color:#000;
+    border:2px solid #000;
+    border-bottom:4px solid #a37e00;
+    border-radius:5px;
+    cursor:pointer;
+  }
+  .settings .save-btn:active{ border-bottom-width:2px; transform:translateY(2px); }
+  .settings .save-btn.secondary{
+    margin-top:6px; background:rgba(255,255,255,.06); color:rgba(244,244,240,.75);
+    border:2px solid rgba(255,255,255,.18); border-bottom:3px solid rgba(255,255,255,.18);
+  }
+  .settings .save-btn.secondary:hover{ background:rgba(255,255,255,.12); color:#fff; }
+  .settings .save-btn.secondary.confirm{ background:#8f0400; color:#fff; border-color:#d61a18; }
+
+  /* Settings theme: inside the panel, text and inactive buttons are translucent
+     so only the active choice is solid yellow. (Higher specificity than the
+     base buttons above, so these win regardless of order.) */
+  .settings .field label,
+  .settings .field > span,
+  .settings .hint,
+  .settings .msg-line{ color:rgba(244,244,240,.62); }
+  .settings .section-title{ color:rgba(244,244,240,.65); }
+  .settings .msg-line.err{ color:#ff8a8a; }   /* status colors must beat the translucent default above */
+  .settings .msg-line.ok{ color:#7dff8a; }
+  .settings .mode-btn,
+  .settings .part-tab,
+  .settings .toggle-btn.off,
+  .settings .info-btn:not(.active),
+  .settings .chip{
+    background:rgba(255,255,255,.06);
+    color:rgba(244,244,240,.55);
+    border:2px solid rgba(255,255,255,.14);
+    border-bottom:3px solid rgba(255,255,255,.14);
+  }
+  .settings .mode-btn.active,
+  .settings .part-tab.active{
+    background:var(--accent); color:#000;
+    border:2px solid #000; border-bottom:3px solid #a37e00;
+  }
+  .settings .field input{ border-color:rgba(255,255,255,.16); color:rgba(255,204,0,.9); }
+  .settings .toggle-btn.off:hover,
+  .settings .mode-btn:not(.active):hover,
+  .settings .part-tab:not(.active):hover{ color:rgba(244,244,240,.85); background:rgba(255,255,255,.1); }
+
+  /* ---------- 7. OVERLAYS & NOTICES ---------- */
+  /* keyboard shortcut cheat sheet: covers the whole widget */
+  .shortcuts-overlay{
+    display:none;
+    position:absolute; top:0; left:0; right:0; bottom:0;
+    z-index:30;
+    background:#0e0e12;
+    padding:12px 14px;
+    color:var(--text);
+    overflow:hidden;
+  }
+  .shortcuts-overlay.open{ display:block; }
+  .shortcuts-overlay h3{
+    margin:0 0 8px;
+    font-family:'Press Start 2P', monospace;
+    font-size:8px; letter-spacing:1px;
+    color:var(--accent);
+  }
+  .shortcuts-overlay .state{ font-size:13px; color:var(--text-dim); margin-bottom:6px; }
+  .shortcuts-overlay .state b{ color:#5cff6b; font-weight:normal; }
+  .shortcuts-overlay .state b.off{ color:#ff6b6b; }
+  .shortcuts-overlay ul{ list-style:none; margin:0; padding:0; }
+  .shortcuts-overlay li{
+    display:flex; justify-content:space-between; align-items:center;
+    font-size:16px; padding:2px 0;
+    border-bottom:1px dashed #2c2c34;
+  }
+  .shortcuts-overlay kbd{
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    background:#3a3a44; color:#fff;
+    border:2px solid #000; border-bottom:3px solid #1c1c22;
+    border-radius:4px; padding:3px 6px; margin-left:4px;
+  }
+
+  /* lap-goal banner: covers the track */
+  .goal-banner{
+    position:absolute; left:0; right:0; top:0; bottom:0; z-index:25;
+    display:none; flex-direction:column; align-items:center; justify-content:center; gap:5px;
+    background:rgba(10,10,14,.84); text-align:center;
+    font-family:'Press Start 2P', monospace;
+  }
+  .goal-banner.show{ display:flex; animation:goalIn .35s ease-out; }
+  @keyframes goalIn{ from{ opacity:0; transform:scale(.96); } to{ opacity:1; transform:none; } }
+  .goal-banner .goal-title{ font-size:9px; color:var(--accent); letter-spacing:1px; }
+  .goal-banner .goal-sub{ font-size:8px; color:rgba(244,244,240,.6); }
+  .goal-banner .goal-btns{ display:flex; gap:6px; margin-top:2px; }
+  .goal-banner .toggle-btn{ padding:4px 8px; }
+  .goal-banner .toggle-btn.off{ background:rgba(255,255,255,.06); color:rgba(244,244,240,.7); border:2px solid rgba(255,255,255,.2); border-bottom:3px solid rgba(255,255,255,.2); }
+
+  /* toast */
+  .notice{
+    position:absolute; left:6px; right:6px; bottom:6px; z-index:30;
+    display:none; align-items:center; justify-content:center; gap:7px;
+    padding:5px 8px; background:rgba(10,10,14,.9);
+    border:1px solid rgba(255,255,255,.22); border-radius:4px;
+    font-family:'Press Start 2P', monospace; font-size:8px; line-height:1.6;
+    color:rgba(244,244,240,.85); text-align:center; cursor:default;
+  }
+  .notice.show{ display:flex; }
+  .notice .toggle-btn{ padding:3px 7px; flex:none; }
+
+  /* shown instead of the widget after Close */
+  .closed-msg{
+    display:none;
+    padding:22px 14px;
+    text-align:center;
+    background:var(--panel);
+    color:var(--text);
+    font-size:15px;
+  }
+  .closed-msg button{
+    margin-top:9px;
+    font-family:'Press Start 2P', monospace;
+    font-size:8px;
+    padding:7px 9px;
+    background:var(--accent);
+    border:2px solid #000;
+    border-radius:5px;
+    cursor:pointer;
+  }
+
+  /* ---------- 8. STATS PANEL ---------- */
+  .statspanel{ color:var(--text); }
+  .stat-tiles{ display:flex; gap:6px; margin-bottom:9px; }
+  .stat-tile{
+    flex:1; text-align:center;
+    background:#0e0e12; border:2px solid var(--panel-border); border-radius:5px;
+    padding:6px 2px 5px;
+  }
+  .stat-tile b{
+    display:block; font-weight:normal;
+    font-family:'Press Start 2P', monospace; font-size:10px;
+    color:var(--accent); margin-bottom:5px;
+  }
+  .stat-tile span{ font-size:12px; color:var(--text-dim); letter-spacing:1px; }
+  .st-title{
+    font-family:'Press Start 2P', monospace; font-size:8px; letter-spacing:1px;
+    color:var(--text-dim); margin:8px 0 5px;
+  }
+  .bars{ display:flex; align-items:flex-end; gap:5px; height:74px; }
+  .bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+  .bar{ width:100%; background:#3a5a8a; border:1px solid #000; border-radius:2px 2px 0 0; min-height:1px; }
+  .bar-col.today .bar{ background:var(--accent); }
+  .bar-val{ font-size:11px; color:var(--text-dim); line-height:1; margin-bottom:2px; white-space:nowrap; }
+  .bar-day{ font-size:12px; color:var(--text-dim); margin-top:2px; line-height:1; }
+  .bar-col.today .bar-day{ color:var(--accent); }
+  .st-grid{ display:grid; grid-template-columns:1fr 1fr; gap:3px 10px; font-size:15px; }
+  .st-grid div{ display:flex; justify-content:space-between; border-bottom:1px dashed #2c2c34; }
+  .st-grid em{ font-style:normal; color:var(--accent); }
+  .subj{ display:flex; align-items:center; gap:6px; font-size:14px; margin-bottom:3px; }
+  .subj .nm{ width:84px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .subj .track{ flex:1; height:7px; background:#0e0e12; border:1px solid #000; border-radius:2px; overflow:hidden; }
+  .subj .fill{ height:100%; background:var(--red); }
+  .subj .du{ width:52px; text-align:right; color:var(--text-dim); }
+  .empty-note{ font-size:13px; color:var(--text-dim); }
+  .danger-btn{
+    width:100%; margin-top:9px; padding:7px;
+    background:#3a3a44; color:#cfcfd6;
+    border:2px solid #000; border-bottom:3px solid #1c1c22; border-radius:5px;
+  }
+  .danger-btn.confirm{ background:#7a1414; color:#fff; border-bottom-color:#3a0808; }
+
+  /* ---------- 9. ACCESSIBILITY & TOUCH ---------- */
+  .sr-only{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+  button:focus-visible, [role="button"]:focus-visible, .swatch:focus-visible, .phase:focus-visible,
+  .settings input:focus-visible, .play-wrap button:focus-visible{
+    outline:2px solid #ffcc00;
+    outline-offset:2px;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .goal-banner.show{ animation:none; }
+    .car-inner.idle{ animation:none; }
+    .notice, .goal-banner{ transition:none; }
+  }
+  @media (pointer:coarse){
+    .iconbtn{ position:relative; }
+    .iconbtn::after{ content:''; position:absolute; inset:-7px; }   /* bigger hit area, same look */
+    .toggle-btn, .mode-btn, .part-tab{ min-height:30px; }
+    .step-btn{ width:30px; height:30px; }
+    .swatch{ min-width:26px; min-height:26px; }
+  }
+
+  /* ---------- 10. INSTALLED APP (PWA) ----------
+     Installed as an app: give the transparent page a real backdrop and keep
+     the widget clear of notches / home indicator. */
+  @media (display-mode: standalone), (display-mode: fullscreen){
+    html,body{ background:#0e0e12; }
+    body{ padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  }
+</style>
+</head>
+<body>
+
+<div class="widget" id="widget">
+  <div class="sr-only" id="srStatus" role="status" aria-live="polite"></div>
+
+  <!-- ===== Track: sky, scenery, road, car, grid, overlays ===== -->
+  <div class="track-wrap" id="trackWrap">
+    <div class="titlebar">
+      <div class="btns">
+        <div class="iconbtn" id="statsBtn" title="Statistics (T)"><svg width="11" height="11" viewBox="0 0 11 11" shape-rendering="crispEdges" fill="#fff"><rect x="1" y="6" width="2" height="5"/><rect x="4.5" y="2" width="2" height="9"/><rect x="8" y="4" width="2" height="7"/></svg></div>
+        <div class="iconbtn" id="gearBtn" title="Settings (G)">⚙</div>
+        <div class="iconbtn close" id="closeBtn" title="Close">✕</div>
+      </div>
+    </div>
+    <div class="notice" id="notice" role="status" aria-live="polite"></div>
+    <div class="goal-banner" id="goalBanner" role="status" aria-live="polite">
+      <div class="goal-title">🏁 TARGET REACHED</div>
+      <div class="goal-sub" id="goalSub"></div>
+      <div class="goal-btns">
+        <button class="toggle-btn" id="goalContinue">CONTINUE</button>
+        <button class="toggle-btn off" id="goalReset">RESET</button>
+      </div>
+    </div>
+
+    <div class="clouds"></div>
+    <div class="house-roof"></div>
+    <div class="house-body"></div>
+    <div class="house-window"></div>
+    <div class="vegetation"></div>
+    <div class="grass"></div>
+    <div class="curb top"></div>
+    <div class="road"><div class="road-dash"></div></div>
+    <div class="curb bottom"></div>
+
+    <div class="grid-formation" id="gridFormation"></div>
+    <div class="car no-anim" id="car"><div class="exhaust off" id="exhaust"><span class="puff p1"></span><span class="puff p2"></span><span class="puff p3"></span><span class="puff p4"></span><span class="puff extra e1"></span><span class="puff extra e2"></span><span class="puff extra e3"></span><span class="puff extra e4"></span></div><div class="car-inner idle"><img src="data:image/png;base64,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" alt=""></div></div>
+  </div>
+
+  <!-- ===== Status line ===== -->
+  <div class="status">
+    <div class="status-left">
+      <div class="phase" id="phaseLabel" title="Click to rename">STUDY</div>
+      <div class="lap" id="lapLabel">LAP 0</div>
+    </div>
+    <div class="time" id="timeLabel" role="timer" aria-label="Time remaining">90:00</div>
+  </div>
+
+  <!-- ===== Main controls ===== -->
+  <div class="controls">
+    <div class="play-wrap">
+      <svg class="play-progress" id="playProgress" aria-hidden="true">
+        <rect class="play-progress-rect" id="playProgressRect" fill="none"/>
+      </svg>
+      <button class="ctrl-btn" id="playBtn" title="Start / pause (Space)">▶ START</button>
+    </div>
+    <button class="ctrl-btn secondary" id="resetBtn" title="Reset (R)">RESET</button>
+    <button class="ctrl-btn tertiary" id="skipBtn" title="Skip phase (S or →)">»</button>
+  </div>
+
+  <!-- ===== Settings panel ===== -->
+  <div class="settings" id="settingsPanel" role="region" aria-label="Settings">
+    <div class="hint">Pick a race mode, or CUSTOM to set your own minutes (then SAVE SETTINGS). Rename each phase by clicking its label above the timer.</div>
+    <div class="field">
+      <div class="modes" id="modes">
+        <button class="mode-btn" data-study="25" data-pit="5" title="Classic Pomodoro: 25 min study, 5 min stop">SPRINT<small>25 / 5</small></button>
+        <button class="mode-btn" data-study="50" data-pit="10" title="Balanced: 50 min study, 10 min stop">GRAND PRIX<small>50 / 10</small></button>
+        <button class="mode-btn" data-study="90" data-pit="20" title="Deep work: 90 min study, 20 min stop">ENDURANCE<small>90 / 20</small></button>
+        <button class="mode-btn" id="customModeBtn" data-custom="1" title="Choose your own study and stop times">CUSTOM<small>your times</small></button>
+      </div>
+    </div>
+    <div class="custom-fields" id="customFields">
+      <div class="field">
+        <label>📖 Study</label>
+        <input type="number" id="studyInput" min="1" max="300" value="90">
+      </div>
+      <div class="field">
+        <label>🛞 Stop</label>
+        <input type="number" id="pitInput" min="0" max="180" value="20" title="0 = no stop phase: the next study lap starts right away">
+      </div>
+      <div class="field">
+        <label>☕ Long break</label>
+        <button class="toggle-btn" id="longBtn" title="Make the stop longer every few laps">OFF</button>
+      </div>
+      <div class="long-box" id="longBox">
+        <div class="field">
+          <label>Laps before activation</label>
+          <div class="stepper">
+            <button class="step-btn" id="longEveryMinus" aria-label="Fewer laps">−</button>
+            <span class="step-val" id="longEveryVal">4</span>
+            <button class="step-btn" id="longEveryPlus" aria-label="More laps">+</button>
+          </div>
+        </div>
+        <div class="field">
+          <label>Stop time multiplier</label>
+          <div class="stepper">
+            <button class="step-btn" id="longMultMinus" aria-label="Lower multiplier">−</button>
+            <span class="step-val" id="longMultVal">2x</span>
+            <button class="step-btn" id="longMultPlus" aria-label="Higher multiplier">+</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="field">
+      <label>🏁 Lap goal</label>
+      <input type="number" id="goalInput" min="0" max="99" value="0" title="0 = no goal. The timer pauses when this many laps are completed.">
+    </div>
+    <div class="field">
+      <label>🔊 Sound cues</label>
+      <div class="field-right">
+        <input type="range" class="vol-slider" id="volSlider" min="0" max="100" step="5" value="70" aria-label="Volume" title="Volume">
+        <button class="toggle-btn" id="soundBtn">ON</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>🔔 Notifications</label>
+      <button class="toggle-btn" id="notifyBtn" title="Browser notification on phase change (when the tab is in the background)">OFF</button>
+    </div>
+    <div class="field">
+      <label>🌄 Background</label>
+      <button class="toggle-btn" id="bgBtn">ON</button>
+    </div>
+    <div class="field">
+      <label>🔆 Keep screen on</label>
+      <button class="toggle-btn" id="wakeBtn" title="Prevents the screen from sleeping while the timer is running">ON</button>
+    </div>
+    <div class="field">
+      <label>⌨ Shortcuts</label>
+      <div class="field-right">
+        <button class="info-btn" id="infoBtn" title="Show keyboard shortcuts" aria-pressed="false">i</button>
+        <button class="toggle-btn" id="shortcutsBtn">ON</button>
+      </div>
+    </div>
+    <div class="field color-field">
+      <label>🎨 Livery</label>
+    </div>
+    <div class="part-tabs" id="partTabs"></div>
+    <div class="swatch-row" id="swatchRow"></div>
+
+    <div class="section-title">💾 PRESETS</div>
+    <div class="preset-list" id="presetList"></div>
+    <div class="preset-save">
+      <input type="text" id="presetName" maxlength="16" placeholder="preset name" autocomplete="off">
+      <button class="toggle-btn" id="presetSaveBtn">+ SAVE</button>
+    </div>
+    <div class="msg-line" id="presetMsg"></div>
+
+    <div class="section-title">📦 BACKUP</div>
+    <div class="field">
+      <label>All data (JSON)</label>
+      <div class="field-right">
+        <button class="toggle-btn" id="exportBtn">EXPORT</button>
+        <button class="toggle-btn off" id="importBtn">IMPORT</button>
+      </div>
+    </div>
+    <div class="backup-confirm" id="backupConfirm">
+      <span id="backupConfirmText"></span>
+      <button class="toggle-btn" id="backupYes">REPLACE</button>
+      <button class="toggle-btn off" id="backupNo">CANCEL</button>
+    </div>
+    <div class="msg-line" id="backupMsg"></div>
+    <input type="file" id="importFile" accept=".json,application/json" hidden>
+
+    <div class="about">Pit Stop Study Timer v1.0.0 · Everything stays in your browser: no accounts, no tracking. Pixel fonts: Press Start 2P &amp; VT323 (SIL Open Font License). Independent project, not affiliated with any racing series or team.</div>
+    <button class="save-btn" id="saveBtn">SAVE SETTINGS</button>
+    <button class="save-btn secondary" id="resetSettingsBtn">RESET SETTINGS</button>
+  </div>
+
+  <!-- ===== Keyboard shortcut cheat sheet (opened with the "i" button) ===== -->
+  <div class="shortcuts-overlay" id="shortcutsOverlay" aria-hidden="true">
+    <h3>KEYBOARD SHORTCUTS</h3>
+    <div class="state">Shortcuts are <b id="shortcutsState">ON</b></div>
+    <ul>
+      <li><span>Start / pause</span><span><kbd>SPACE</kbd></span></li>
+      <li><span>Reset</span><span><kbd>R</kbd></span></li>
+      <li><span>Skip phase</span><span><kbd>S</kbd> <kbd>→</kbd></span></li>
+      <li><span>Sound on/off</span><span><kbd>M</kbd></span></li>
+      <li><span>Settings</span><span><kbd>G</kbd> <kbd>,</kbd></span></li>
+      <li><span>Statistics</span><span><kbd>T</kbd></span></li>
+      <li><span>Close this panel</span><span><kbd>ESC</kbd></span></li>
+    </ul>
+  </div>
+
+  <!-- ===== Statistics panel ===== -->
+  <div class="statspanel" id="statsPanel" role="region" aria-label="Statistics">
+    <div class="stat-tiles">
+      <div class="stat-tile"><b id="stToday">0m</b><span>TODAY</span></div>
+      <div class="stat-tile"><b id="stLaps">0</b><span>LAPS</span></div>
+      <div class="stat-tile"><b id="stStreak">0</b><span>STREAK</span></div>
+    </div>
+    <div class="st-title">LAST 7 DAYS</div>
+    <div class="bars" id="stBars"></div>
+    <div class="st-title">ALL TIME</div>
+    <div class="st-grid">
+      <div>Study <em id="stTotal">0m</em></div>
+      <div>Laps <em id="stTotalLaps">0</em></div>
+      <div>Sessions <em id="stSessions">0</em></div>
+      <div>Avg session <em id="stAvg">0m</em></div>
+    </div>
+    <div class="st-title">BY SUBJECT</div>
+    <div id="stSubjects"></div>
+    <button class="danger-btn" id="resetStatsBtn">RESET STATS</button>
+  </div>
+
+  <!-- ===== Shown instead of everything above after Close ===== -->
+  <div class="closed-msg" id="closedMsg">
+    Widget closed.<br>
+    <button id="reopenBtn">REOPEN</button>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  /*
+   * Pit Stop Study Timer — one self-contained widget (no build step, no network).
+   *
+   * Reading guide (sections appear in this order):
+   *   1. Constants & DOM          — limits, defaults, element lookups
+   *   2. Settings                 — sanitize / load / save (localStorage)
+   *   3. State & helpers          — the timer state, small pure helpers
+   *   4. Track layout             — car position, starting grid, finish line, day/night sky
+   *   5. Car livery               — per-part recoloring of the car sprite on a canvas
+   *   6. Audio                    — beeps for phase changes, UI sound effects
+   *   7. Timer engine             — wall-clock ticking, phase switching, laps
+   *   8. Rendering                — countdown, progress ring, tab title, wake lock
+   *   9. Main controls            — play / reset / skip / rename / close
+   *  10. Settings panel           — modes, long break, lap goal, toggles, save/reset
+   *  11. Statistics               — per-day study time, stats panel
+   *  12. Presets & backup         — named presets, JSON export / import
+   *  13. Notices & notifications  — toasts, browser notifications, multi-tab guard
+   *  14. Keyboard & accessibility — shortcuts, ARIA mirroring
+   *  15. Start-up                 — first render and the main loop
+   *
+   * Persistent data lives in `settings`, `stats` and `presets` (localStorage);
+   * everything about the running timer lives in `state` and resets on reload.
+   * Persisted data is always passed through a sanitize function on load/import,
+   * so a corrupt or hand-edited value can't break the page.
+   */
+
+  /* =====================================================================
+     1. CONSTANTS & DOM
+     ===================================================================== */
+  function $(id){ return document.getElementById(id); }
+
+  var LIMITS = {                       // [min, max] for every user-editable number
+    study:     { min:1, max:300 },     // minutes
+    pit:       { min:0, max:180 },     // minutes; 0 = no stop phase
+    lapGoal:   { min:0, max:99 },      // 0 = no goal
+    longEvery: { min:0, max:99 },      // 0 = long break off
+    volume:    { min:0, max:100 }
+  };
+  var LONG_MULT_MIN = 1, LONG_MULT_MAX = 10, LONG_MULT_STEP_MIN = 1.5; // multiplier range / smallest value the stepper offers
+  var NAME_MAX = 16;                   // max length of phase names, color keys and preset names
+
+  var DEFAULTS = {
+    study: 90, pit: 20, studyName: 'STUDY', pitName: 'STOP',
+    carColor: 'red', carStripe: 'gold', carLower: 'black',    // body / stripe / sidepod
+    soundOn: true, volume: 70, shortcutsOn: true, backgroundOn: true,
+    wakeLockOn: true, notifyOn: false,
+    lapGoal: 0, longEvery: 0, longMult: 2
+  };
+  var VOLUME_REF = 70;                 // slider value that plays at the originally designed loudness
+
+  var STORAGE = {
+    settings: 'pitstop-timer-settings',
+    stats:    'pitstop-timer-stats',
+    presets:  'pitstop-timer-presets',
+    active:   'pitstop-timer-active',      // which tab is currently running the timer
+    welcomed: 'pitstop-timer-welcomed'
+  };
+
+  var GAP_LIMIT_MS = 5 * 60 * 1000;    // no tick for this long = computer slept: pause instead of counting it
+  var NOTICE_MS = 7000;                // how long a toast stays up
+  var CONFIRM_MS = 3000;               // window for the second click of "click again to confirm" buttons
+  var STATS_SAVE_MS = 10000;           // while studying, stats are flushed to storage this often
+  var WAKE_RETRY_MS = 30000;           // back-off after a refused wake-lock request
+  var MAX_PRESETS = 12;
+
+  var trackWrap = $('trackWrap');
+  var carEl = $('car');
+  var carImgEl = carEl.querySelector('img');
+  var exhaustEl = $('exhaust');
+  var gridFormationEl = $('gridFormation');
+
+  var phaseLabel = $('phaseLabel');
+  var lapLabel = $('lapLabel');
+  var timeLabel = $('timeLabel');
+  var playBtn = $('playBtn');
+  var resetBtn = $('resetBtn');
+  var skipBtn = $('skipBtn');
+  var gearBtn = $('gearBtn');
+  var statsBtn = $('statsBtn');
+  var closeBtn = $('closeBtn');
+  var playProgressSvg = $('playProgress');
+  var playProgressRect = $('playProgressRect');
+  var settingsPanel = $('settingsPanel');
+  var statsPanel = $('statsPanel');
+  var noticeEl = $('notice');
+  var srStatus = $('srStatus');
+
+  var studyInput = $('studyInput');
+  var pitInput = $('pitInput');
+  var goalInput = $('goalInput');
+  var goalBanner = $('goalBanner');
+  var goalSub = $('goalSub');
+  var soundBtn = $('soundBtn');
+  var volSlider = $('volSlider');
+  var notifyBtn = $('notifyBtn');
+  var bgBtn = $('bgBtn');
+  var wakeBtn = $('wakeBtn');
+  var shortcutsBtn = $('shortcutsBtn');
+  var infoBtn = $('infoBtn');
+  var shortcutsOverlay = $('shortcutsOverlay');
+  var shortcutsState = $('shortcutsState');
+  var longBtn = $('longBtn');
+  var longBox = $('longBox');
+  var longEveryVal = $('longEveryVal');
+  var longMultVal = $('longMultVal');
+  var customFieldsEl = $('customFields');
+  var customModeBtn = $('customModeBtn');
+  var modeBtns = Array.prototype.slice.call(document.querySelectorAll('#modes .mode-btn'));
+  var swatchRow = $('swatchRow');
+  var partTabs = $('partTabs');
+  var resetSettingsBtn = $('resetSettingsBtn');
+
+  /* =====================================================================
+     2. SETTINGS
+     ===================================================================== */
+  function clampInt(v, lim, fallback){
+    v = parseInt(v, 10);
+    if(isNaN(v)) return fallback;
+    return Math.min(lim.max, Math.max(lim.min, v));
+  }
+  function clampMult(v){
+    v = parseFloat(v);
+    if(isNaN(v)) return DEFAULTS.longMult;
+    return Math.round(Math.min(LONG_MULT_MAX, Math.max(LONG_MULT_MIN, v)) * 10) / 10;
+  }
+  function pickBool(v, fallback){ return typeof v === 'boolean' ? v : fallback; }
+  function pickText(v, fallback){ return (v || fallback).toString().slice(0, NAME_MAX); }
+
+  /* Turns anything (parsed JSON, a preset, a backup) into a complete, valid
+     settings object. Pure: also used for presets and imports. */
+  function sanitizeSettings(parsed){
+    parsed = (parsed && typeof parsed === 'object') ? parsed : {};
+    return {
+      study:        clampInt(parsed.study, LIMITS.study, DEFAULTS.study),
+      pit:          clampInt(parsed.pit, LIMITS.pit, DEFAULTS.pit),
+      studyName:    pickText(parsed.studyName, DEFAULTS.studyName),
+      pitName:      pickText(parsed.pitName, DEFAULTS.pitName),
+      carColor:     pickText(parsed.carColor, DEFAULTS.carColor),
+      carStripe:    pickText(parsed.carStripe, DEFAULTS.carStripe),
+      carLower:     pickText(parsed.carLower, DEFAULTS.carLower),
+      soundOn:      pickBool(parsed.soundOn, DEFAULTS.soundOn),
+      volume:       clampInt(parsed.volume, LIMITS.volume, DEFAULTS.volume),
+      shortcutsOn:  pickBool(parsed.shortcutsOn, DEFAULTS.shortcutsOn),
+      backgroundOn: pickBool(parsed.backgroundOn, DEFAULTS.backgroundOn),
+      wakeLockOn:   pickBool(parsed.wakeLockOn, DEFAULTS.wakeLockOn),
+      notifyOn:     pickBool(parsed.notifyOn, DEFAULTS.notifyOn),
+      lapGoal:      clampInt(parsed.lapGoal, LIMITS.lapGoal, DEFAULTS.lapGoal),
+      longEvery:    clampInt(parsed.longEvery, LIMITS.longEvery, DEFAULTS.longEvery),
+      longMult:     clampMult(parsed.longMult)
+    };
+  }
+  function readStored(key, sanitize, fallback){
+    try{
+      var raw = localStorage.getItem(key);
+      if(raw) return sanitize(JSON.parse(raw));
+    }catch(e){}
+    return fallback();
+  }
+  var settings = readStored(STORAGE.settings, sanitizeSettings, function(){ return sanitizeSettings({}); });
+  function saveSettings(){ safeSet(STORAGE.settings, JSON.stringify(settings)); }
+
+  /* localStorage write that reports failures (full / blocked) once, instead of failing silently. */
+  var storageWarned = false;
+  function safeSet(key, value){
+    try{ localStorage.setItem(key, value); return true; }
+    catch(e){
+      if(!storageWarned){
+        storageWarned = true;
+        showNotice('Cannot save: browser storage is full or blocked. Settings and stats will be lost when you close this page.', 'OK', null, true);
+      }
+      return false;
+    }
+  }
+
+  /* =====================================================================
+     3. STATE & HELPERS
+     ===================================================================== */
+  var DAY_CYCLE_SEC = 5400;            // 90 minutes of running time = one full dawn→noon→sunset→night loop
+  var DAY_START_SEC = DAY_CYCLE_SEC * 0.25;   // a fresh start begins at noon
+
+  var state = {
+    phase: 'study',            // 'study' | 'pit'
+    durationSec: settings.study * 60,
+    remainingSec: settings.study * 60,
+    running: false,
+    lastTs: null,              // Date.now() of the previous tick (null while paused)
+    lap: 0,                    // becomes 1 only when the car actually touches the finish line
+    lapCounted: false,         // this lap's finish-line touch has already been counted
+    returningToGrid: false,    // end-of-lap return to the grid has started
+    longBreak: false,          // the current stop is a (longer) long break
+    goalHit: false,            // lap goal reached (until Reset / a new goal)
+    phaseStudySec: 0,          // study seconds in the current phase (a "session" = 1 minute)
+    daySec: DAY_START_SEC      // position in the day/night cycle; only advances while running
+  };
+  var bulkMode = false;        // true while catching up on hidden-tab / long gaps (laps are counted directly)
+
+  function formatTime(sec){
+    sec = Math.max(0, Math.ceil(sec));
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function fmtMin(sec){ return Math.round(sec / 60 * 10) / 10; }
+  function pitDurationSec(){ return Math.round(settings.pit * 60 * (state.longBreak ? settings.longMult : 1)); }
+  function pad2(n){ return (n < 10 ? '0' : '') + n; }
+  function dayKey(d){ return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
+  function cleanName(s){ return String(s).replace(/\s+/g, ' ').trim().slice(0, NAME_MAX); }
+  function rectsOverlap(a, b){ return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top; }
+
+  /* ON/OFF style button: label, and the grey "off" look. */
+  function setToggle(btn, on, label){
+    btn.textContent = label || (on ? 'ON' : 'OFF');
+    btn.classList.toggle('off', !on);
+  }
+  /* Two-click confirmation: the first click arms the button (for CONFIRM_MS), the second runs `action`. */
+  function confirmClick(btn, armedText, action, ms){
+    var idleText = btn.textContent, timer = null;
+    btn.addEventListener('click', function(){
+      if(!btn.classList.contains('confirm')){
+        btn.classList.add('confirm');
+        btn.textContent = armedText;
+        timer = setTimeout(function(){ btn.classList.remove('confirm'); btn.textContent = idleText; }, ms || CONFIRM_MS);
+        return;
+      }
+      clearTimeout(timer);
+      btn.classList.remove('confirm');
+      btn.textContent = idleText;
+      action();
+    });
+  }
+  function announce(text){   // screen-reader live region
+    srStatus.textContent = '';
+    setTimeout(function(){ srStatus.textContent = text; }, 60);
+  }
+
+  /* =====================================================================
+     4. TRACK LAYOUT: car position, starting grid, finish line, sky
+     ===================================================================== */
+  var CAR_TRUE_W = 205, CAR_TRUE_H = 46;            // native pixel grid of the car sprite
+  var CAR_DISPLAY_W = 128;
+  var CAR_DISPLAY_H = Math.round(CAR_DISPLAY_W * (CAR_TRUE_H / CAR_TRUE_W));
+  var CAR_START_OFFSET = 60;                        // px left of center: the car's spot on the grid
+  carEl.style.width = CAR_DISPLAY_W + 'px';
+  carEl.style.height = CAR_DISPLAY_H + 'px';
+
+  var GRID_BOX_W = 90;                              // must match .grid-box width in CSS
+  var GRID_GAP = 22;                                // gap between consecutive grid boxes
+  var GRID_ROW1_COUNT = 10;                         // the car's box + 9 more behind it
+  var ROW2_SET_BACK = 22;                           // px a row-2 box sits behind its row-1 counterpart
+  var FORMATION_TAIL = (GRID_ROW1_COUNT - 1) * (GRID_BOX_W + GRID_GAP) + ROW2_SET_BACK;   // length of the whole grid behind the lead box
+  var NEAR_CURB_SPEED = 12 / 0.3;                   // px/s: must match .curb.bottom (12px tile every 0.3s). Everything on the ground moves at this speed.
+  var FINISH_LINE_DISTANCE = Math.round(NEAR_CURB_SPEED * 3);   // the line sits ~3 s ahead of the lead grid box
+
+  var trackWidth = 294;                             // updated by layout()
+  var carCenterX = 0, carStartX = 0;
+  var carStarted = false;                           // true while the car is out on track; false while parked on the grid
+
+  var GRID_SVG_MARKUP =                             // one grid box, reused for every box
+    '<svg viewBox="0 0 200 70">' +
+      '<path d="M10,26 L10,18 L20,18 L172,18" fill="none" stroke="#e8e8ec" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<path d="M2,58 L2,48 L22,48 L172,48" fill="none" stroke="#e8e8ec" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<polygon points="172,18 190,18 190,48 172,48" fill="#e8e8ec" stroke="#c7c7cc" stroke-width="1"/>' +
+      '<rect x="0" y="0" width="16" height="7" fill="#e8e8ec" transform="translate(58,29.5)"/>' +
+      '<rect x="0" y="0" width="16" height="7" fill="#e8e8ec" transform="translate(93,29.5)"/>' +
+      '<rect x="0" y="0" width="16" height="7" fill="#e8e8ec" transform="translate(128,29.5)"/>' +
+    '</svg>';
+
+  function addGridBox(offsetXPx, extraClass){
+    var box = document.createElement('div');
+    box.className = 'grid-box' + (extraClass ? ' ' + extraClass : '');
+    box.style.left = offsetXPx + 'px';
+    box.innerHTML = GRID_SVG_MARKUP;
+    gridFormationEl.appendChild(box);
+  }
+  // row 1: the car's box (index 0) plus 9 behind it; row 2: a smaller box beside each, set back a little
+  for(var gi = 0; gi < GRID_ROW1_COUNT; gi++){
+    var rowOffset = -(gi * (GRID_BOX_W + GRID_GAP));
+    addGridBox(rowOffset);
+    addGridBox(rowOffset - ROW2_SET_BACK, 'row2');
+  }
+  // The finish line is part of the same ground-marking group, so it scrolls and pauses with the grid.
+  var finishLineEl = document.createElement('div');
+  finishLineEl.className = 'finish-line';
+  finishLineEl.style.left = (FINISH_LINE_DISTANCE + 16) + 'px';
+  gridFormationEl.appendChild(finishLineEl);
+
+  function layout(){
+    trackWidth = trackWrap.clientWidth || trackWrap.offsetWidth || 294;
+    carCenterX = Math.round(trackWidth / 2 - CAR_DISPLAY_W / 2);
+    carStartX = Math.max(4, carCenterX - CAR_START_OFFSET);
+    carEl.style.left = (carStarted ? carCenterX : carStartX) + 'px';
+    // the grid box sits mostly BEHIND the car, whose nose overlaps its front cap
+    gridFormationEl.style.left = (carStartX + CAR_DISPLAY_W - GRID_BOX_W - 10) + 'px';
+  }
+  window.addEventListener('resize', layout);
+
+  /* How long before study ends the grid must start coming back: the time the
+     WHOLE formation (lead box to last box) needs to queue up off-screen to the
+     right and slide into place at NEAR_CURB_SPEED. */
+  function gridReturnSec(){
+    return (trackWidth + GRID_BOX_W + FORMATION_TAIL) / NEAR_CURB_SPEED;
+  }
+
+  /* ---- Day/night sky: colors blend between these stops as daySec advances ---- */
+  var DAY_STOPS = [
+    { t:0.00, top:'#ff9a76', bottom:'#ffd9a0', cloud:0.85, window:'#2a4a66' },   // dawn
+    { t:0.25, top:'#4fb3f0', bottom:'#bfe6ff', cloud:1.00, window:'#24405c' },   // noon
+    { t:0.50, top:'#ff7e5f', bottom:'#feb47b', cloud:0.80, window:'#3a3550' },   // sunset
+    { t:0.75, top:'#0b1d3a', bottom:'#1b2a4a', cloud:0.06, window:'#ffd166' },   // night
+    { t:1.00, top:'#ff9a76', bottom:'#ffd9a0', cloud:0.85, window:'#2a4a66' }    // dawn again
+  ];
+  function hexLerp(a, b, t){
+    var ar = parseInt(a.slice(1,3),16), ag = parseInt(a.slice(3,5),16), ab = parseInt(a.slice(5,7),16);
+    var br = parseInt(b.slice(1,3),16), bg = parseInt(b.slice(3,5),16), bb = parseInt(b.slice(5,7),16);
+    var r = Math.round(ar + (br-ar)*t), g = Math.round(ag + (bg-ag)*t), bl = Math.round(ab + (bb-ab)*t);
+    return '#' + [r,g,bl].map(function(v){ return (v < 16 ? '0' : '') + v.toString(16); }).join('');
+  }
+  function numLerp(a, b, t){ return a + (b-a)*t; }
+  // Sets the sky / cloud / window CSS variables for the current time of day (cheap enough to call every tick).
+  function applyDaylight(){
+    var progress = (state.daySec % DAY_CYCLE_SEC) / DAY_CYCLE_SEC;
+    var i = 0;
+    while(i < DAY_STOPS.length - 2 && DAY_STOPS[i+1].t <= progress) i++;
+    var a = DAY_STOPS[i], b = DAY_STOPS[i+1];
+    var span = b.t - a.t;
+    var localT = span > 0 ? (progress - a.t) / span : 0;
+    var root = document.documentElement.style;
+    root.setProperty('--sky-top', hexLerp(a.top, b.top, localT));
+    root.setProperty('--sky-bottom', hexLerp(a.bottom, b.bottom, localT));
+    root.setProperty('--cloud-opacity', numLerp(a.cloud, b.cloud, localT).toFixed(2));
+    root.setProperty('--window-color', hexLerp(a.window, b.window, localT));
+  }
+
+  /* =====================================================================
+     5. CAR LIVERY
+     Three independently colorable parts: body (red bodywork), stripe (white
+     band along the side) and lower (black sidepod above the floor; the bare
+     carbon floor itself is never recolored). The sprite is segmented once
+     into those parts and each part is recolored per pixel on a canvas — not
+     with a CSS filter — so every swatch is the EXACT color you get, while
+     shading and untouched details (wings, wheels, helmet) stay as drawn.
+     The sprite's own colors are each part's "stock" choice and are never repainted.
+     ===================================================================== */
+  var CAR_SHADOW = 'drop-shadow(0 2px 1px rgba(0,0,0,.55))';
+  var CAR_COLORS = {
+    red:    '#ce141c',   // = mean livery red of the original sprite
+    orange: '#e8741a',
+    gold:   '#d9a21a',
+    green:  '#1a9a3a',
+    teal:   '#12a6a0',
+    blue:   '#1a56d6',
+    navy:   '#1d2f8f',
+    purple: '#7a2ad6',
+    pink:   '#e0489a',
+    white:  '#e6e6ec',
+    silver: '#9aa0a6',
+    black:  '#3c3c46'    // carbon: a touch lighter so it doesn't vanish into the asphalt
+  };
+  var COLOR_ORDER = ['red','orange','gold','green','teal','blue','navy','purple','pink','white','silver','black'];
+  // per part: its palette (the same 12 colors, except that the part's own original color is its exact stock swatch)
+  function paletteWith(key, hex){ var p = {}; for(var k in CAR_COLORS) p[k] = CAR_COLORS[k]; p[key] = hex; return p; }
+  var PARTS = {
+    body:   { label:'BODY',    setting:'carColor',  stock:'red',   colors: CAR_COLORS },
+    stripe: { label:'STRIPE',  setting:'carStripe', stock:'white', colors: paletteWith('white', '#ffffff') },
+    lower:  { label:'SIDEPOD', setting:'carLower',  stock:'black', colors: paletteWith('black', '#242424') }
+  };
+  var PART_ORDER = ['body','stripe','lower'];
+  var activePart = 'body';           // which part the swatch row is editing
+
+  var CAR_VREF = 206;                // brightest-channel level of the original red bodywork
+  var LOWER_BASE = 36;               // brightest-channel level of the original near-black sidepod
+  // The sidepod paint blends (smoothstep) back into the original carbon between these rows, like a shadowed undercut.
+  var FADE_START = 30, FADE_END = 39;
+
+  var carOrigSrc = carImgEl.getAttribute('src');
+  var carBase = null;                // ImageData of the original sprite, once decoded
+  var carSeg = null;                 // per-pixel part (0 none, 1 body, 2 stripe, 3 lower) + blend weight
+  var carCache = {};                 // "body|stripe|lower" -> recolored data URL
+
+  function hexToRgb(h){
+    return [parseInt(h.substr(1,2),16), parseInt(h.substr(3,2),16), parseInt(h.substr(5,2),16)];
+  }
+
+  /* Splits the sprite into its parts. Body = clearly red pixels; stripe =
+     whitish pixels in the band between the wheels, below the helmet; lower =
+     the dark/grey sidepod pixels under the livery (bounded per column by the
+     lowest body/stripe pixel, and above the floor seam), outside the wheels. */
+  function segmentCar(img){
+    var W = img.width, H = img.height, d = img.data;
+    var n = W*H;
+    var cls = new Uint8Array(n), wt = new Float32Array(n), mxA = new Uint8Array(n);
+    var sat = new Float32Array(n), mnA = new Uint8Array(n);
+    var x, y, i;
+    for(i=0;i<n;i++){
+      var r=d[i*4], g=d[i*4+1], b=d[i*4+2];
+      var mx=Math.max(r,g,b), mn=Math.min(r,g,b);
+      mxA[i]=mx; mnA[i]=mn; sat[i]= mx>0 ? (mx-mn)/mx : 0;
+    }
+    // pass 1: body + stripe pixels; remember the lowest livery pixel of every column
+    var bottom = new Int16Array(W); for(x=0;x<W;x++) bottom[x] = -1;
+    for(y=0;y<H;y++){
+      for(x=0;x<W;x++){
+        i = y*W+x;
+        if(d[i*4+3] === 0) continue;
+        var rr=d[i*4], gg=d[i*4+1], bb=d[i*4+2];
+        if(rr > gg*1.5 && rr > bb*1.5 && sat[i] > 0.3 && mxA[i] >= 60){ // >=60: ignore near-black pixels that merely lean red
+          cls[i]=1; wt[i]=Math.min(1,Math.max(0,(sat[i]-0.3)/0.4));
+        } else if(x>=30 && (x<=122 || (x<=152 && y<=30)) && y>=19 && y<=36 && mnA[i]>=95 && sat[i]<0.45){ // x<=152: the stripe keeps running toward the nose
+          cls[i]=2; wt[i]=Math.min(1,Math.max(0,(mnA[i]-95)/70));
+        }
+        if(cls[i] && y>=19 && y>bottom[x]) bottom[x]=y;
+      }
+    }
+    // columns with no livery pixel (e.g. the antenna) borrow the nearest column's boundary
+    var known = [];
+    for(x=30;x<=152;x++) if(bottom[x]>=0) known.push(x);
+    if(known.length){
+      for(x=30;x<=152;x++){
+        if(bottom[x] >= 0) continue;
+        var best = known[0];
+        for(var k=1;k<known.length;k++) if(Math.abs(known[k]-x) < Math.abs(best-x)) best = known[k];
+        bottom[x] = bottom[best];
+      }
+    }
+    // pass 2: sidepod = dark pixels below the livery, above the floor seam, outside the wheels
+    for(y=0;y<H;y++){
+      for(x=30;x<=152;x++){
+        i = y*W+x;
+        if(cls[i] || d[i*4+3] === 0) continue;
+        // any dark pixel counts (even a tinted dark one, like the seam post); only bright/colorful ones are livery details
+        if(mxA[i] > 200 || (sat[i] >= 0.35 && mxA[i] > 90) || y < bottom[x]-1 || y >= FADE_END) continue;
+        var dx1=x-25.5, dx2=x-165, dy=y-33;
+        if(dx1*dx1+dy*dy <= 182.25 || dx2*dx2+dy*dy <= 182.25) continue; // wheels
+        var ft = Math.min(1, Math.max(0, (y-FADE_START)/(FADE_END-FADE_START)));
+        cls[i]=3; wt[i]=1 - ft*ft*(3-2*ft);
+      }
+    }
+    return { cls:cls, wt:wt, mx:mxA };
+  }
+
+  function recolorCar(bodyKey, stripeKey, lowerKey){
+    var ck = bodyKey+'|'+stripeKey+'|'+lowerKey;
+    if(carCache[ck]) return carCache[ck];
+    var tBody   = (bodyKey   !== PARTS.body.stock)   ? hexToRgb(PARTS.body.colors[bodyKey])     : null;
+    var tStripe = (stripeKey !== PARTS.stripe.stock) ? hexToRgb(PARTS.stripe.colors[stripeKey]) : null;
+    var tLower  = (lowerKey  !== PARTS.lower.stock)  ? hexToRgb(PARTS.lower.colors[lowerKey])   : null;
+    var cv = document.createElement('canvas');
+    cv.width = carBase.width; cv.height = carBase.height;
+    var ctx = cv.getContext('2d');
+    var out = ctx.createImageData(carBase.width, carBase.height);
+    var s = carBase.data, d = out.data, cls = carSeg.cls, wt = carSeg.wt, mxA = carSeg.mx;
+    var n = cls.length;
+    for(var p=0;p<n;p++){
+      var o = p*4, r=s[o], g=s[o+1], b=s[o+2];
+      var tr=r, tg=g, tb=b;
+      var part = cls[p], w = wt[p], mx = mxA[p];
+      if(part === 1 && tBody){                 // body: keep the original shading (brightness relative to the stock red)
+        var k = mx / CAR_VREF;
+        tr = r + (Math.min(255, tBody[0]*k) - r)*w;
+        tg = g + (Math.min(255, tBody[1]*k) - g)*w;
+        tb = b + (Math.min(255, tBody[2]*k) - b)*w;
+      } else if(part === 2 && tStripe){        // stripe: shading relative to white
+        var ks = mx / 255;
+        tr = r + (Math.min(255, tStripe[0]*ks) - r)*w;
+        tg = g + (Math.min(255, tStripe[1]*ks) - g)*w;
+        tb = b + (Math.min(255, tStripe[2]*ks) - b)*w;
+      } else if(part === 3 && tLower){         // sidepod: shift the target color by the pixel's offset from the stock black
+        var dl = mx - LOWER_BASE;
+        tr = r + (Math.max(0, Math.min(255, tLower[0] + dl)) - r)*w;
+        tg = g + (Math.max(0, Math.min(255, tLower[1] + dl)) - g)*w;
+        tb = b + (Math.max(0, Math.min(255, tLower[2] + dl)) - b)*w;
+      }
+      d[o]=tr; d[o+1]=tg; d[o+2]=tb; d[o+3]=s[o+3];
+    }
+    ctx.putImageData(out, 0, 0);
+    return (carCache[ck] = cv.toDataURL('image/png'));
+  }
+
+  function partKey(part){            // the chosen color key of a part (falls back to stock if the saved key is unknown)
+    var P = PARTS[part];
+    return P.colors[settings[P.setting]] ? settings[P.setting] : P.stock;
+  }
+  function applyCarColor(){
+    var bk = partKey('body'), sk = partKey('stripe'), lk = partKey('lower');
+    var allStock = bk === PARTS.body.stock && sk === PARTS.stripe.stock && lk === PARTS.lower.stock;
+    carImgEl.src = (allStock || !carBase) ? carOrigSrc : recolorCar(bk, sk, lk);
+    carImgEl.style.filter = CAR_SHADOW;
+    var cur = partKey(activePart);
+    var sw = swatchRow.querySelectorAll('.swatch');
+    for(var i=0;i<sw.length;i++) sw[i].classList.toggle('active', sw[i].dataset.color === cur);
+  }
+  // (re)builds the swatch row for the active part and applies the car color
+  function buildSwatches(){
+    swatchRow.innerHTML = '';
+    var P = PARTS[activePart];
+    COLOR_ORDER.forEach(function(key){
+      var b = document.createElement('div');
+      b.className = 'swatch';
+      b.dataset.color = key;
+      b.style.background = P.colors[key];
+      b.title = key + (key === P.stock ? ' (stock)' : '');
+      b.addEventListener('click', function(){
+        settings[P.setting] = key;
+        saveSettings();
+        applyCarColor();
+        renderPresets();
+      });
+      swatchRow.appendChild(b);
+    });
+    var tabs = partTabs.querySelectorAll('.part-tab');
+    for(var i=0;i<tabs.length;i++) tabs[i].classList.toggle('active', tabs[i].dataset.part === activePart);
+    applyCarColor();
+  }
+  PART_ORDER.forEach(function(part){
+    var t = document.createElement('button');
+    t.className = 'part-tab';
+    t.dataset.part = part;
+    t.textContent = PARTS[part].label;
+    t.addEventListener('click', function(){ activePart = part; buildSwatches(); });
+    partTabs.appendChild(t);
+  });
+  // decode + segment the original sprite once; re-apply so saved colors show
+  (function(){
+    var im = new Image();
+    im.onload = function(){
+      var c = document.createElement('canvas');
+      c.width = im.naturalWidth; c.height = im.naturalHeight;
+      var x = c.getContext('2d');
+      x.drawImage(im, 0, 0);
+      try{ carBase = x.getImageData(0, 0, c.width, c.height); }catch(e){ return; }
+      carSeg = segmentCar(carBase);
+      applyCarColor();
+    };
+    im.src = carOrigSrc;
+  })();
+
+  /* =====================================================================
+     6. AUDIO — all sounds respect the "Sound cues" setting and volume slider
+     ===================================================================== */
+  var audioCtx = null;
+  function getAudio(){   // created lazily (browsers need a user gesture first)
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+  /* One short synth note. o = { type:'square'|'triangle'|'sawtooth', vol, to (glide to this frequency) } */
+  function tone(freq, dur, delay, o){
+    if(!settings.soundOn) return;
+    o = o || {};
+    try{
+      var ctx = getAudio();
+      var t0 = ctx.currentTime + (delay || 0);
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = o.type || 'square';
+      osc.frequency.setValueAtTime(freq, t0);
+      if(o.to) osc.frequency.exponentialRampToValueAtTime(o.to, t0 + dur);
+      gain.gain.setValueAtTime((o.vol || 0.03) * settings.volume / VOLUME_REF, t0);
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0); osc.stop(t0 + dur + 0.02);
+    }catch(e){ /* audio not available: ignore */ }
+  }
+  // phase-change jingles
+  var PHASE_VOL = { vol:0.06 };
+  function playStartPitSound(){   tone(660,0.12,0,PHASE_VOL); tone(880,0.15,0.13,PHASE_VOL); }
+  function playLongBreakSound(){  tone(660,0.12,0,PHASE_VOL); tone(880,0.12,0.13,PHASE_VOL); tone(1100,0.22,0.26,PHASE_VOL); }
+  function playStartStudySound(){ tone(440,0.15,0,PHASE_VOL); tone(660,0.15,0.16,PHASE_VOL); }
+
+  // UI sound effects: short and quiet, one distinct cue per kind of action
+  var SFX = {
+    click:  function(){ tone(1400, 0.035, 0, {vol:0.025}); },
+    panel:  function(){ tone(900, 0.05, 0, {type:'triangle', vol:0.035}); },
+    on:     function(){ tone(700, 0.05, 0, {vol:0.03}); tone(1050, 0.06, 0.05, {vol:0.03}); },
+    off:    function(){ tone(1050, 0.05, 0, {vol:0.03}); tone(650, 0.07, 0.05, {vol:0.03}); },
+    start:  function(){ tone(520, 0.07, 0, {type:'triangle', vol:0.05}); tone(780, 0.1, 0.07, {type:'triangle', vol:0.05}); },
+    pause:  function(){ tone(560, 0.07, 0, {type:'triangle', vol:0.05}); tone(380, 0.1, 0.07, {type:'triangle', vol:0.05}); },
+    reset:  function(){ tone(600, 0.06, 0, {type:'triangle', vol:0.045}); tone(450, 0.06, 0.07, {type:'triangle', vol:0.045}); tone(300, 0.1, 0.14, {type:'triangle', vol:0.045}); },
+    skip:   function(){ tone(400, 0.12, 0, {type:'sawtooth', to:1200, vol:0.025}); },
+    lap:    function(){ tone(1320, 0.09, 0, {type:'triangle', vol:0.05}); tone(1760, 0.14, 0.07, {type:'triangle', vol:0.04}); },
+    goal:   function(){
+      [523, 659, 784, 1047].forEach(function(f, i){ tone(f, 0.16, i*0.11, {type:'triangle', vol:0.07}); });
+      tone(1047, 0.45, 0.46, {type:'triangle', vol:0.07}); tone(1319, 0.45, 0.46, {type:'triangle', vol:0.05});
+    }
+  };
+  /* One delegated listener maps every button to its cue (keyboard shortcuts
+     call .click(), so they sound the same). It runs after the button's own
+     handler, so the state it reads (ON/OFF text, running) is already updated. */
+  var PANEL_BTNS = ['gearBtn','statsBtn','infoBtn','closeBtn','reopenBtn'];
+  var TOGGLE_BTNS = ['notifyBtn','longBtn','bgBtn','shortcutsBtn','wakeBtn'];   // ON → rising cue, OFF → falling cue
+  document.addEventListener('click', function(e){
+    var el = e.target.closest ? e.target.closest('button, .iconbtn, .swatch, .part-tab, .chip, .ctrl-btn, .toggle-btn') : null;
+    if(!el) return;
+    var id = el.id;
+    if(id === 'soundBtn'){ if(settings.soundOn) SFX.on(); }
+    else if(id === 'playBtn' || id === 'goalContinue') (state.running ? SFX.start : SFX.pause)();
+    else if(id === 'resetBtn' || id === 'goalReset') SFX.reset();
+    else if(id === 'skipBtn') return;                       // skip already plays the new phase's own jingle
+    else if(PANEL_BTNS.indexOf(id) >= 0) SFX.panel();
+    else if(TOGGLE_BTNS.indexOf(id) >= 0) (el.textContent === 'ON' ? SFX.on : SFX.off)();
+    else SFX.click();
+  });
+
+  /* =====================================================================
+     7. TIMER ENGINE
+     Time comes from the wall clock (Date.now), not from animation frames,
+     so it stays exact when the tab is hidden and frames stop.
+     update() → advance(delta) → applyStep(step) per phase slice → switchPhase()
+     ===================================================================== */
+  function applyStep(step){
+    if(state.phase === 'study') trackStudy(step);
+    state.remainingSec -= step;
+    state.daySec += step;       // the sky advances only here (real running time), never on Skip
+    if(state.phase === 'study' && carStarted && !state.returningToGrid && state.remainingSec <= gridReturnSec()){
+      returnToGrid(state.remainingSec);
+    }
+    // a lap is counted the instant the car's sprite touches the finish line during the launch
+    if(carStarted && !state.returningToGrid && !state.lapCounted &&
+       rectsOverlap(carEl.getBoundingClientRect(), finishLineEl.getBoundingClientRect())){
+      state.lapCounted = true;
+      countLap();
+    }
+  }
+  /* Consumes `delta` real seconds, crossing as many phase boundaries as needed
+     (a hidden tab can be throttled for a long time). */
+  function advance(delta){
+    bulkMode = document.hidden || delta > 2;
+    var guard = 0;
+    while(delta > 0 && guard++ < 1000){
+      var step = Math.min(delta, Math.max(state.remainingSec, 0));
+      applyStep(step);
+      delta -= step;
+      if(state.remainingSec <= 0) switchPhase(); else break;
+      if(!state.running) break;   // lap goal reached: stop consuming time
+    }
+    bulkMode = false;
+    applyDaylight();
+  }
+  function update(){
+    if(state.running){
+      var now = Date.now();
+      if(state.lastTs !== null){
+        var gapMs = now - state.lastTs;
+        // Even a throttled hidden tab ticks about once a minute, so a gap this
+        // long means the computer slept / the page was frozen.
+        if(gapMs > GAP_LIMIT_MS){
+          state.running = false; state.lastTs = null;
+          render();
+          showNotice('Paused: no activity for ' + Math.round(gapMs / 60000) + ' min (computer asleep?). That time was not counted.');
+          return;
+        }
+        advance(Math.max(0, gapMs / 1000));
+      }
+      state.lastTs = now;
+      render();
+    } else {
+      state.lastTs = null;
+      if(statsDirty) saveStats();   // paused: flush what was accumulated
+    }
+  }
+  function tick(){
+    update();
+    requestAnimationFrame(tick);
+  }
+
+  /* Parks the car on its grid box and brings the grid back into view — used to
+     enter every pit stop and by Reset. */
+  function parkAtGrid(){
+    carStarted = false;
+    state.returningToGrid = false;
+    state.lapCounted = false;
+    carEl.classList.add('no-anim');
+    carEl.style.transitionDuration = '';     // clear any override left by returnToGrid()
+    carEl.style.left = carStartX + 'px';
+    exhaustEl.classList.add('off');
+    exhaustEl.classList.remove('burst');
+    gridFormationEl.classList.remove('launching', 'returning');
+  }
+  /* Drives the car off the grid to the center with an exhaust burst while the
+     grid formation scrolls away at the near curb's speed. Used by the first
+     Play press and automatically at the end of every stop. No-op if already out. */
+  function launchCar(){
+    if(carStarted) return;
+    carStarted = true;
+    state.returningToGrid = false;
+    carEl.classList.remove('no-anim');
+    carEl.style.transitionDuration = '';     // use the normal CSS launch duration
+    carEl.style.left = carCenterX + 'px';
+    exhaustEl.classList.remove('off');
+    exhaustEl.classList.add('burst');
+    var gridTravel = trackWidth + GRID_BOX_W;
+    gridFormationEl.style.setProperty('--grid-retreat-dist', '-' + gridTravel + 'px');
+    gridFormationEl.style.animationDuration = (gridTravel / NEAR_CURB_SPEED) + 's';
+    gridFormationEl.classList.add('launching');
+  }
+  /* End-of-lap return: starts exactly gridReturnSec() before study ends. The
+     grid/finish line approach from the right at NEAR_CURB_SPEED while the car
+     eases back to its grid box; the entry distance is derived from the time
+     left so the speed stays pinned and everything lands as the countdown hits 0. */
+  function returnToGrid(secondsLeft){
+    state.returningToGrid = true;
+    var left = Math.max(0.05, secondsLeft);
+    carEl.style.transitionDuration = left + 's';
+    carEl.style.left = carStartX + 'px';
+    gridFormationEl.classList.remove('launching');
+    gridFormationEl.style.setProperty('--grid-entry-dist', (NEAR_CURB_SPEED * left) + 'px');
+    gridFormationEl.style.animationDuration = left + 's';
+    gridFormationEl.classList.add('returning');
+  }
+
+  /* Study ↔ stop. `isSkip`: the user pressed Skip — no notification, no lap goal, never counts a lap. */
+  function switchPhase(isSkip){
+    state.phaseStudySec = 0;
+    if(state.phase === 'study'){
+      var noPit = settings.pit === 0;             // Stop = 0: skip the stop phase entirely
+      if(noPit){
+        state.longBreak = false;
+        state.durationSec = settings.study * 60;  // straight into the next study lap
+      } else {
+        state.phase = 'pit';
+        // every Nth lap the stop is longer (only if a long break is set)
+        state.longBreak = settings.longEvery > 0 && state.lap > 0 && state.lap % settings.longEvery === 0 && settings.longMult > 1;
+        state.durationSec = pitDurationSec();
+      }
+      state.remainingSec = state.durationSec;
+      var goalNow = !isSkip && settings.lapGoal > 0 && !state.goalHit && state.lap >= settings.lapGoal;
+      if(goalNow){
+        state.goalHit = true;
+        state.running = false;                    // stop here: the user decides what comes next
+        showGoalBanner();
+        notifyGoal();
+      } else if(noPit){
+        playStartStudySound(); if(!isSkip) notifyPhase('study');
+      } else {
+        (state.longBreak ? playLongBreakSound : playStartPitSound)(); if(!isSkip) notifyPhase('pit');
+      }
+      // The lap counter is NOT bumped here: it counts when the car touches the finish line on the next launch.
+      parkAtGrid();
+      if(noPit && !goalNow){
+        void carEl.offsetWidth;                   // restart the CSS transition from the grid spot
+        launchCar();
+        if(bulkMode && !state.lapCounted){ state.lapCounted = true; countLap(); }
+      }
+    } else {
+      state.phase = 'study';
+      state.longBreak = false;
+      state.durationSec = settings.study * 60;
+      state.remainingSec = state.durationSec;
+      playStartStudySound();
+      if(!isSkip) notifyPhase('study');
+      launchCar();                                // stop over: launch for the new study lap
+      // hidden tab: no frames, so the car never visibly crosses the line
+      if(bulkMode && !state.lapCounted){ state.lapCounted = true; countLap(); }
+    }
+    if(!state.goalHit || state.running){
+      announce((state.phase === 'study' ? settings.studyName : (state.longBreak ? 'Long break' : settings.pitName)) +
+               ' started, ' + fmtMin(state.durationSec) + ' minutes');
+    }
+  }
+  /* +1 lap with a brief green flash. Called only when the car touches the finish line. */
+  function countLap(){
+    state.lap++;
+    trackLap();
+    lapLabel.classList.remove('flash');
+    void lapLabel.offsetWidth;                    // restart the animation even if still mid-flash
+    lapLabel.classList.add('flash');
+    SFX.lap();
+    announce('Lap ' + state.lap);
+  }
+
+  /* ---- Lap goal ---- */
+  function hideGoalBanner(){ goalBanner.classList.remove('show'); }
+  function showGoalBanner(){
+    goalSub.textContent = state.lap + ' / ' + settings.lapGoal + ' LAPS DONE';
+    goalBanner.classList.add('show');
+    lapLabel.classList.add('goal-done');
+    SFX.goal();
+    announce('Target reached: ' + state.lap + ' laps completed. Continue or reset.');
+    try{ $('goalContinue').focus({ preventScroll:true }); }catch(e){}
+  }
+  function clearGoal(){ state.goalHit = false; lapLabel.classList.remove('goal-done'); }
+
+  /* =====================================================================
+     8. RENDERING
+     ===================================================================== */
+  var baseTitle = document.title;
+
+  /* Sizes the progress ring's SVG/rect to the play button's rendered box (+4px
+     halo each side) so the stroke traces a clean outline at any size. Measures
+     real px (not viewBox scaling) so getTotalLength() is an exact perimeter. */
+  var playRingLength = 0;
+  function syncProgressRing(){
+    var w = playBtn.offsetWidth + 8;
+    var h = playBtn.offsetHeight + 8;
+    if(w <= 8 || h <= 8) return;                  // not laid out yet
+    playProgressSvg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    playProgressSvg.setAttribute('width', w);
+    playProgressSvg.setAttribute('height', h);
+    var sw = 3, rx = 8;                           // stroke width, corner radius
+    playProgressRect.setAttribute('x', sw/2);
+    playProgressRect.setAttribute('y', sw/2);
+    playProgressRect.setAttribute('width', w - sw);
+    playProgressRect.setAttribute('height', h - sw);
+    playProgressRect.setAttribute('rx', rx);
+    playProgressRect.setAttribute('ry', rx);
+    playRingLength = playProgressRect.getTotalLength();
+    playProgressRect.style.strokeDasharray = playRingLength;
+    updatePlayProgress();
+  }
+  function updatePlayProgress(){
+    var frac = state.durationSec > 0 ? Math.min(1, Math.max(0, 1 - (state.remainingSec / state.durationSec))) : 0;
+    playProgressRect.style.strokeDashoffset = playRingLength * (1 - frac);
+    playProgressRect.classList.toggle('pit', state.phase === 'pit');
+    playProgressRect.classList.toggle('idle', !state.running);
+  }
+  window.addEventListener('resize', syncProgressRing);
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(syncProgressRing);
+
+  function updateTitle(){
+    var t;
+    if(goalBanner.classList.contains('show')) t = '🏁 Target reached · ' + baseTitle;
+    else if(state.running) t = formatTime(state.remainingSec) + ' · ' + (state.phase === 'study' ? settings.studyName : settings.pitName) + ' · ' + baseTitle;
+    else t = baseTitle;
+    if(document.title !== t) document.title = t;
+  }
+
+  /* Screen wake lock: held only while the timer runs, the tab is visible and the setting is on. */
+  var wakeSentinel = null, wakeBusy = false, wakeRetryAt = 0;
+  function syncWakeLock(){
+    var want = state.running && settings.wakeLockOn && !document.hidden;
+    if(want && !wakeSentinel && !wakeBusy && navigator.wakeLock && Date.now() >= wakeRetryAt){
+      wakeBusy = true;
+      navigator.wakeLock.request('screen').then(function(s){
+        wakeBusy = false; wakeSentinel = s;
+        s.addEventListener('release', function(){ if(wakeSentinel === s) wakeSentinel = null; });
+        if(!(state.running && settings.wakeLockOn)){ wakeSentinel = null; s.release().catch(function(){}); }
+      }).catch(function(){ wakeBusy = false; wakeRetryAt = Date.now() + WAKE_RETRY_MS; });
+    } else if(!want && wakeSentinel){
+      var s = wakeSentinel; wakeSentinel = null;
+      try{ s.release().catch(function(){}); }catch(e){}
+    }
+  }
+
+  /* Redraws everything that depends on `state` / `settings`. Cheap; called every running frame. */
+  function render(){
+    timeLabel.textContent = formatTime(state.remainingSec);
+    lapLabel.textContent = 'LAP ' + state.lap + (settings.lapGoal > 0 ? '/' + settings.lapGoal : '') +
+      (state.longBreak && state.phase === 'pit' ? ' · LONG BREAK' : '');
+    updatePlayProgress();
+    if(!phaseLabel.isContentEditable){          // don't clobber a name being typed
+      var isStudy = state.phase === 'study';
+      phaseLabel.textContent = isStudy ? settings.studyName : settings.pitName;
+      phaseLabel.classList.toggle('pit', !isStudy);
+    }
+    // the scenery scrolls only while running a study lap: the car is parked during a stop
+    trackWrap.classList.toggle('paused', !(state.running && state.phase !== 'pit'));
+    playBtn.textContent = state.running ? '⏸ PAUSE' : '▶ START';
+    updateTitle();
+    syncWakeLock();
+  }
+
+  /* =====================================================================
+     9. MAIN CONTROLS
+     ===================================================================== */
+  function togglePlay(){
+    state.running = !state.running;
+    hideGoalBanner();
+    if(state.running){
+      try{ getAudio(); }catch(e){}               // unlock audio inside this user gesture
+      if(state.phase === 'study') launchCar();   // first start of a study phase: drive from the grid to center
+      announceRunning();
+    }
+    render();
+  }
+  function resetTimer(){
+    state.running = false;
+    state.longBreak = false;
+    hideGoalBanner();
+    clearGoal();
+    state.phase = 'study';
+    state.durationSec = settings.study * 60;
+    state.remainingSec = state.durationSec;
+    state.daySec = DAY_START_SEC;
+    state.lap = 0;
+    state.phaseStudySec = 0;
+    applyDaylight();
+    parkAtGrid();
+    render();
+  }
+  playBtn.addEventListener('click', togglePlay);
+  resetBtn.addEventListener('click', resetTimer);
+  skipBtn.addEventListener('click', function(){ switchPhase(true); render(); });
+  $('goalContinue').addEventListener('click', function(){
+    hideGoalBanner();
+    if(!state.running) togglePlay();            // resume (the stop phase starts)
+  });
+  $('goalReset').addEventListener('click', resetTimer);
+
+  gearBtn.addEventListener('click', function(){
+    settingsPanel.classList.toggle('open');
+    if(!settingsPanel.classList.contains('open')) setShortcutsInfo(false);
+  });
+
+  /* ---- rename a phase by clicking its label ---- */
+  phaseLabel.addEventListener('click', function(){
+    if(phaseLabel.isContentEditable) return;
+    phaseLabel.setAttribute('contenteditable', 'true');
+    phaseLabel.classList.add('editing');
+    phaseLabel.focus();
+    var range = document.createRange();
+    range.selectNodeContents(phaseLabel);
+    var sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  });
+  function stopLabelEdit(){
+    phaseLabel.setAttribute('contenteditable', 'false');
+    phaseLabel.classList.remove('editing');
+  }
+  phaseLabel.addEventListener('blur', function(){
+    if(!phaseLabel.isContentEditable) return;
+    stopLabelEdit();
+    var val = phaseLabel.textContent.replace(/\s+/g, ' ').trim().toUpperCase().slice(0, NAME_MAX);
+    if(state.phase === 'study') settings.studyName = val || DEFAULTS.studyName;
+    else settings.pitName = val || DEFAULTS.pitName;
+    saveSettings();
+    renderPresets();
+    render();
+  });
+  phaseLabel.addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ e.preventDefault(); phaseLabel.blur(); }
+    if(e.key === 'Escape'){ e.preventDefault(); stopLabelEdit(); render(); }
+  });
+
+  /* ---- close / reopen ---- */
+  closeBtn.addEventListener('click', function(){
+    state.running = false;
+    try{ window.close(); }catch(e){}              // only works for windows opened by script
+    setTimeout(function(){                        // otherwise show the "closed" message
+      var toHide = document.querySelectorAll('#widget .titlebar, #widget .track-wrap, #widget .status, #widget .controls, #widget .settings, #widget .statspanel');
+      for(var i=0;i<toHide.length;i++) toHide[i].style.display = 'none';
+      $('closedMsg').style.display = 'block';
+    }, 200);
+  });
+  $('reopenBtn').addEventListener('click', function(){ location.reload(); });
+
+  /* =====================================================================
+     10. SETTINGS PANEL
+     ===================================================================== */
+  /* Applies new durations while keeping the time already spent in the running phase. */
+  function applyDurations(newStudy, newPit){
+    if(state.phase === 'study'){
+      var spentStudy = settings.study * 60 - state.remainingSec;
+      settings.study = newStudy; settings.pit = newPit;
+      state.durationSec = settings.study * 60;
+      state.remainingSec = Math.max(0, state.durationSec - spentStudy);
+    } else {
+      settings.study = newStudy; settings.pit = newPit;
+      retimePit();
+    }
+    studyInput.value = settings.study;
+    pitInput.value = settings.pit;
+    updateLongUI();
+    updateModeBtns();
+  }
+  // recomputes the running stop's length, keeping the time already spent in it
+  function retimePit(){
+    var spent = state.durationSec - state.remainingSec;
+    state.durationSec = pitDurationSec();
+    state.remainingSec = Math.max(0, state.durationSec - spent);
+  }
+
+  /* ---- race modes: SPRINT / GRAND PRIX / ENDURANCE / CUSTOM ----
+     A mode button is highlighted when the current minutes match it; anything
+     else (or a saved long break, or CUSTOM picked) shows the custom fields. */
+  var customPicked = settings.longEvery > 0;
+  function updateModeBtns(){
+    var matched = false;
+    modeBtns.forEach(function(b){
+      if(b.dataset.custom) return;
+      var on = !customPicked && +b.dataset.study === settings.study && +b.dataset.pit === settings.pit;
+      if(on) matched = true;
+      b.classList.toggle('active', on);
+    });
+    var custom = customPicked || !matched;
+    customModeBtn.classList.toggle('active', custom);
+    customFieldsEl.classList.toggle('show', custom);
+  }
+  modeBtns.forEach(function(b){
+    b.addEventListener('click', function(){
+      if(b.dataset.custom){ customPicked = true; updateModeBtns(); return; }
+      customPicked = false;
+      settings.longEvery = 0;                     // ready-made modes have no long break
+      applyDurations(+b.dataset.study, +b.dataset.pit);
+      saveSettings();
+      renderPresets();
+      render();
+    });
+  });
+
+  /* ---- long break: toggle + two steppers, applied instantly ---- */
+  var LONG_EVERY_DEFAULT = 4;
+  var longLastEvery = settings.longEvery > 0 ? settings.longEvery : LONG_EVERY_DEFAULT;   // remembered while the toggle is off
+  function fmtMult(v){ return (Math.round(v * 10) / 10) + 'x'; }
+  function updateLongUI(){
+    var on = settings.longEvery > 0;
+    setToggle(longBtn, on);
+    longBox.classList.toggle('show', on);
+    longEveryVal.textContent = on ? settings.longEvery : longLastEvery;
+    longMultVal.textContent = fmtMult(settings.longMult);
+  }
+  function commitLong(){
+    if(state.phase === 'pit') retimePit();        // a stop in progress changes length right away
+    saveSettings(); updateLongUI(); renderPresets(); render();
+  }
+  longBtn.addEventListener('click', function(){
+    if(settings.longEvery > 0){ longLastEvery = settings.longEvery; settings.longEvery = 0; }
+    else { settings.longEvery = longLastEvery; customPicked = true; }
+    commitLong();
+  });
+  function stepLaps(d){
+    var cur = settings.longEvery > 0 ? settings.longEvery : longLastEvery;
+    settings.longEvery = Math.min(LIMITS.longEvery.max, Math.max(1, cur + d));
+    longLastEvery = settings.longEvery;
+    commitLong();
+  }
+  function stepMult(d){
+    settings.longMult = Math.min(LONG_MULT_MAX, Math.max(LONG_MULT_STEP_MIN, Math.round((settings.longMult + d) * 10) / 10));
+    commitLong();
+  }
+  $('longEveryMinus').addEventListener('click', function(){ stepLaps(-1); });
+  $('longEveryPlus').addEventListener('click', function(){ stepLaps(1); });
+  $('longMultMinus').addEventListener('click', function(){ stepMult(-0.5); });
+  $('longMultPlus').addEventListener('click', function(){ stepMult(0.5); });
+
+  /* ---- lap goal ---- */
+  goalInput.addEventListener('change', function(){
+    settings.lapGoal = clampInt(goalInput.value, LIMITS.lapGoal, DEFAULTS.lapGoal);
+    goalInput.value = settings.lapGoal;
+    clearGoal();                                  // a new goal can be reached again
+    saveSettings(); render();
+  });
+
+  /* ---- sound + volume ---- */
+  function updateSoundBtn(){
+    setToggle(soundBtn, settings.soundOn);
+    volSlider.classList.toggle('hide', !settings.soundOn);
+  }
+  volSlider.addEventListener('input', function(){
+    settings.volume = clampInt(volSlider.value, LIMITS.volume, DEFAULTS.volume);
+  });
+  volSlider.addEventListener('change', function(){
+    saveSettings();
+    SFX.click(); SFX.lap();                       // audible sample at the new level
+  });
+
+  /* ---- background / shortcuts toggles ---- */
+  function updateBgBtn(){
+    setToggle(bgBtn, settings.backgroundOn);
+    trackWrap.classList.toggle('no-bg', !settings.backgroundOn);
+  }
+  function updateShortcutsBtn(){
+    setToggle(shortcutsBtn, settings.shortcutsOn);
+    shortcutsState.textContent = settings.shortcutsOn ? 'ON' : 'OFF';
+    shortcutsState.classList.toggle('off', !settings.shortcutsOn);
+  }
+  /* A plain boolean setting: click flips it, saves it and refreshes its button. */
+  function bindToggle(btn, key, refresh){
+    btn.addEventListener('click', function(){
+      settings[key] = !settings[key];
+      saveSettings();
+      refresh();
+    });
+  }
+  bindToggle(soundBtn, 'soundOn', updateSoundBtn);
+  bindToggle(bgBtn, 'backgroundOn', updateBgBtn);
+  bindToggle(shortcutsBtn, 'shortcutsOn', updateShortcutsBtn);
+
+  function setShortcutsInfo(open){                // the "i" cheat sheet
+    shortcutsOverlay.classList.toggle('open', open);
+    shortcutsOverlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+    infoBtn.classList.toggle('active', open);
+    infoBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
+  }
+  infoBtn.addEventListener('click', function(){ setShortcutsInfo(!shortcutsOverlay.classList.contains('open')); });
+  shortcutsOverlay.addEventListener('click', function(){ setShortcutsInfo(false); });
+
+  /* ---- keep-screen-on ---- */
+  function updateWakeBtn(){
+    var supported = !!navigator.wakeLock;
+    setToggle(wakeBtn, supported && settings.wakeLockOn, supported ? null : 'N/A');
+    if(!supported) wakeBtn.title = 'Not supported by this browser (needs https or localhost)';
+  }
+  wakeBtn.addEventListener('click', function(){
+    if(!navigator.wakeLock) return;
+    settings.wakeLockOn = !settings.wakeLockOn;
+    saveSettings(); updateWakeBtn(); render();
+  });
+
+  /* ---- browser notifications: turning ON asks for permission ---- */
+  function updateNotifyBtn(){
+    var supported = ('Notification' in window);
+    var on = supported && settings.notifyOn && Notification.permission === 'granted';
+    var denied = supported && Notification.permission === 'denied';
+    setToggle(notifyBtn, on, on ? 'ON' : (!supported ? 'N/A' : denied ? 'BLOCKED' : 'OFF'));
+    if(!supported) notifyBtn.title = 'Notifications are not supported in this browser';
+    else if(denied) notifyBtn.title = 'Blocked by the browser: allow notifications for this site in the browser settings (not possible on file:// pages — open the app over https)';
+    else notifyBtn.title = 'Browser notification on phase change (when the tab is in the background)';
+  }
+  notifyBtn.addEventListener('click', function(){
+    if(!('Notification' in window)) return;
+    if(settings.notifyOn){ settings.notifyOn = false; saveSettings(); updateNotifyBtn(); return; }
+    var done = function(p){
+      settings.notifyOn = (p === 'granted');
+      saveSettings(); updateNotifyBtn();
+    };
+    try{
+      var r = Notification.requestPermission(done);   // old browsers use the callback, new ones the promise
+      if(r && r.then) r.then(done);
+    }catch(e){}
+  });
+
+  /* ---- SAVE SETTINGS / RESET SETTINGS ---- */
+  $('saveBtn').addEventListener('click', function(){
+    applyDurations(clampInt(studyInput.value, LIMITS.study, settings.study),
+                   clampInt(pitInput.value, LIMITS.pit, settings.pit));
+    saveSettings();
+    renderPresets();
+    settingsPanel.classList.remove('open');
+    render();
+  });
+  /* Back to the defaults. Stats, presets and the running timer's progress are left alone. */
+  confirmClick(resetSettingsBtn, 'SURE? CLICK AGAIN', function(){
+    var defaults = sanitizeSettings({});
+    var oldStudy = settings.study, oldPit = settings.pit;
+    state.longBreak = false;
+    Object.keys(defaults).forEach(function(k){ settings[k] = defaults[k]; });
+    settings.study = oldStudy; settings.pit = oldPit;     // applyDurations needs the old values to keep elapsed time
+    customPicked = false;
+    longLastEvery = LONG_EVERY_DEFAULT;
+    applyDurations(defaults.study, defaults.pit);
+    volSlider.value = settings.volume;
+    goalInput.value = settings.lapGoal;
+    clearGoal();
+    saveSettings();
+    refreshSettingsUI();
+    buildSwatches(); renderPresets(); render();
+    showNotice('Settings reset to defaults.');
+  });
+  function refreshSettingsUI(){                   // re-syncs every settings control with `settings`
+    updateSoundBtn(); updateNotifyBtn(); updateBgBtn(); updateShortcutsBtn(); updateWakeBtn(); updateLongUI();
+  }
+
+  /* =====================================================================
+     11. STATISTICS
+     Study time is accumulated in applyStep() while a STUDY phase runs, so an
+     interrupted session (pause, Reset, closing the tab) still counts exactly
+     the time that really elapsed; Skip never adds any. Stored per local day
+     and per phase label (rename STUDY to "Analisi 2" and it gets its own row).
+     Shape: { days: { 'YYYY-MM-DD': { LABEL: { sec, laps, sessions } } } }
+     ===================================================================== */
+  function sanitizeStats(p){
+    var out = { days:{} };
+    if(!p || typeof p !== 'object' || !p.days || typeof p.days !== 'object') return out;
+    Object.keys(p.days).forEach(function(dk){
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(dk)) return;
+      var src = p.days[dk];
+      if(!src || typeof src !== 'object') return;
+      var day = {};
+      Object.keys(src).slice(0,50).forEach(function(lab){
+        var b = src[lab];
+        if(!b || typeof b !== 'object') return;
+        var name = cleanName(lab).toUpperCase() || DEFAULTS.studyName;
+        var sec = Number(b.sec), laps = parseInt(b.laps,10), ses = parseInt(b.sessions,10);
+        var cur = day[name] || (day[name] = { sec:0, laps:0, sessions:0 });
+        cur.sec += (isFinite(sec) && sec > 0) ? Math.min(sec, 86400) : 0;
+        cur.laps += laps > 0 ? Math.min(laps, 5000) : 0;
+        cur.sessions += ses > 0 ? Math.min(ses, 5000) : 0;
+      });
+      if(Object.keys(day).length) out.days[dk] = day;
+    });
+    return out;
+  }
+  function loadStats(){ return readStored(STORAGE.stats, sanitizeStats, function(){ return { days:{} }; }); }
+  var stats = loadStats();
+  var statsDirty = false, lastStatsSave = 0;
+  function saveStats(){
+    safeSet(STORAGE.stats, JSON.stringify(stats));
+    statsDirty = false; lastStatsSave = Date.now();
+  }
+  function statBucket(){                          // today's counters for the current study label
+    var k = dayKey(new Date());
+    var day = stats.days[k] || (stats.days[k] = {});
+    var lab = String(settings.studyName || DEFAULTS.studyName).toUpperCase();
+    return day[lab] || (day[lab] = { sec:0, laps:0, sessions:0 });
+  }
+  function trackStudy(sec){
+    if(!(sec > 0)) return;
+    var b = statBucket();
+    b.sec += sec;
+    var before = state.phaseStudySec;
+    state.phaseStudySec += sec;
+    if(before < 60 && state.phaseStudySec >= 60) b.sessions++;    // a "session" = a study phase that reached 1 minute
+    statsDirty = true;
+    if(Date.now() - lastStatsSave > STATS_SAVE_MS) saveStats();
+  }
+  function trackLap(){ statBucket().laps++; saveStats(); }
+  document.addEventListener('visibilitychange', function(){ if(document.hidden && statsDirty) saveStats(); });
+  window.addEventListener('pagehide', function(){ if(statsDirty) saveStats(); });
+
+  var stToday = $('stToday'), stLaps = $('stLaps'), stStreak = $('stStreak'), stBars = $('stBars');
+  var stTotal = $('stTotal'), stTotalLaps = $('stTotalLaps'), stSessions = $('stSessions'), stAvg = $('stAvg');
+  var stSubjects = $('stSubjects');
+  var DOW = ['S','M','T','W','T','F','S'];
+  var statsTimer = null;
+
+  function fmtDur(sec){
+    sec = Math.round(sec);
+    if(sec <= 0) return '0m';
+    if(sec < 60) return '<1m';
+    var m = Math.floor(sec/60), h = Math.floor(m/60);
+    m = m % 60;
+    return h > 0 ? h + 'h ' + pad2(m) + 'm' : m + 'm';
+  }
+  function daySum(key){
+    var d = stats.days[key], s = 0, l = 0;
+    if(d) for(var k in d){ s += d[k].sec; l += d[k].laps; }
+    return { sec:s, laps:l };
+  }
+  function make(tag, cls, text){                    // tiny element factory for the stats rows
+    var e = document.createElement(tag);
+    if(cls) e.className = cls;
+    if(text !== undefined) e.textContent = text;
+    return e;
+  }
+  function updateStatsPanel(){
+    var now = new Date();
+    var t = daySum(dayKey(now));
+    stToday.textContent = fmtDur(t.sec);
+    stLaps.textContent = t.laps;
+
+    // streak = consecutive days with >= 1 min studied; today not yet studied doesn't break it
+    var streak = 0, cur = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if(daySum(dayKey(cur)).sec < 60) cur.setDate(cur.getDate()-1);
+    while(streak < 3650 && daySum(dayKey(cur)).sec >= 60){ streak++; cur.setDate(cur.getDate()-1); }
+    stStreak.textContent = streak;
+
+    // last 7 days: bar chart
+    var days = [], max = 0, i;
+    for(i=6;i>=0;i--){
+      var dd = new Date(now.getFullYear(), now.getMonth(), now.getDate()-i);
+      var sm = daySum(dayKey(dd));
+      days.push({ d:dd, sec:sm.sec, laps:sm.laps });
+      if(sm.sec > max) max = sm.sec;
+    }
+    stBars.innerHTML = '';
+    days.forEach(function(x, idx){
+      var col = make('div', 'bar-col' + (idx === 6 ? ' today' : ''));
+      col.title = dayKey(x.d) + ' — ' + fmtDur(x.sec) + ', ' + x.laps + ' laps';
+      var bar = make('div', 'bar');
+      bar.style.height = (x.sec > 0 && max > 0) ? Math.max(3, Math.round(44*x.sec/max)) + 'px' : '1px';
+      col.appendChild(make('div', 'bar-val', x.sec >= 60 ? fmtDur(x.sec) : ''));
+      col.appendChild(bar);
+      col.appendChild(make('div', 'bar-day', DOW[x.d.getDay()]));
+      stBars.appendChild(col);
+    });
+
+    // all time + per subject (top 5)
+    var totSec = 0, totLaps = 0, totSes = 0, subj = {};
+    Object.keys(stats.days).forEach(function(k){
+      var d = stats.days[k];
+      Object.keys(d).forEach(function(lab){
+        totSec += d[lab].sec; totLaps += d[lab].laps; totSes += d[lab].sessions;
+        subj[lab] = (subj[lab] || 0) + d[lab].sec;
+      });
+    });
+    stTotal.textContent = fmtDur(totSec);
+    stTotalLaps.textContent = totLaps;
+    stSessions.textContent = totSes;
+    stAvg.textContent = totSes > 0 ? fmtDur(totSec/totSes) : '0m';
+    var list = Object.keys(subj).map(function(k){ return { n:k, s:subj[k] }; })
+      .filter(function(x){ return x.s > 0; })
+      .sort(function(a,b){ return b.s - a.s; }).slice(0,5);
+    stSubjects.innerHTML = '';
+    if(!list.length) stSubjects.appendChild(make('div', 'empty-note', 'Nothing yet — start a study lap.'));
+    list.forEach(function(x){
+      var row = make('div', 'subj');
+      var track = make('div', 'track'), fill = make('div', 'fill');
+      fill.style.width = Math.round(100*x.s/list[0].s) + '%';
+      track.appendChild(fill);
+      row.appendChild(make('div', 'nm', x.n));
+      row.appendChild(track);
+      row.appendChild(make('div', 'du', fmtDur(x.s)));
+      stSubjects.appendChild(row);
+    });
+  }
+  function setStatsOpen(open){                    // while open, the panel refreshes every second
+    statsPanel.classList.toggle('open', open);
+    clearInterval(statsTimer); statsTimer = null;
+    if(open){ updateStatsPanel(); statsTimer = setInterval(updateStatsPanel, 1000); }
+  }
+  statsBtn.addEventListener('click', function(){ setStatsOpen(!statsPanel.classList.contains('open')); });
+  confirmClick($('resetStatsBtn'), 'SURE? CLICK AGAIN', function(){
+    stats = { days:{} }; saveStats(); updateStatsPanel();
+  });
+
+  /* =====================================================================
+     12. PRESETS & BACKUP
+     A preset = durations + long break + both phase names + the three livery colors.
+     ===================================================================== */
+  function sanitizePresets(arr){
+    var out = [];
+    if(!Array.isArray(arr)) return out;
+    arr.slice(0, MAX_PRESETS).forEach(function(p){
+      if(!p || typeof p !== 'object') return;
+      var name = cleanName(p.name || '');
+      if(!name) return;
+      var s = sanitizeSettings(p);
+      out.push({ name:name, study:s.study, pit:s.pit, longEvery:s.longEvery, longMult:s.longMult, studyName:s.studyName, pitName:s.pitName,
+                 carColor:s.carColor, carStripe:s.carStripe, carLower:s.carLower });
+    });
+    return out;
+  }
+  var presets = readStored(STORAGE.presets, sanitizePresets, function(){ return []; });
+  function savePresets(){ safeSet(STORAGE.presets, JSON.stringify(presets)); }
+
+  var presetList = $('presetList'), presetName = $('presetName'), presetSaveBtn = $('presetSaveBtn'), presetMsg = $('presetMsg');
+  function say(target, text, cls){ target.textContent = text || ''; target.className = 'msg-line' + (cls ? ' ' + cls : ''); }
+
+  var PRESET_KEYS = ['study','pit','longEvery','longMult','studyName','pitName','carColor','carStripe','carLower'];
+  function presetMatches(p){                      // the chip of the preset equal to the current settings is highlighted
+    return PRESET_KEYS.every(function(k){ return p[k] === settings[k]; });
+  }
+  function renderPresets(){
+    presetList.innerHTML = '';
+    if(!presets.length){
+      presetList.appendChild(make('div', 'empty-note', 'No presets yet.'));
+      return;
+    }
+    presets.forEach(function(p, idx){
+      var chip = make('span', 'chip' + (presetMatches(p) ? ' active' : ''));
+      chip.title = p.name + ': ' + p.study + '/' + p.pit + ' min · ' + p.studyName + '/' + p.pitName;
+      var apply = make('button', 'chip-apply', p.name);
+      apply.addEventListener('click', function(){ applyPreset(p); });
+      var del = make('button', 'chip-del', '×');
+      del.title = 'Delete preset';
+      confirmClick(del, '?', function(){ presets.splice(idx, 1); savePresets(); renderPresets(); }, 2500);
+      chip.appendChild(apply); chip.appendChild(del);
+      presetList.appendChild(chip);
+    });
+  }
+  function applyPreset(p){
+    PRESET_KEYS.forEach(function(k){ if(k !== 'study' && k !== 'pit') settings[k] = p[k]; });
+    customPicked = p.longEvery > 0;
+    applyDurations(p.study, p.pit);
+    saveSettings();
+    buildSwatches();
+    renderPresets();
+    render();
+    say(presetMsg, 'Loaded "' + p.name + '".', 'ok');
+  }
+  presetSaveBtn.addEventListener('click', function(){
+    var name = cleanName(presetName.value);
+    if(!name){ say(presetMsg, 'Type a name first.', 'err'); presetName.focus(); return; }
+    var entry = { name:name };
+    PRESET_KEYS.forEach(function(k){ entry[k] = settings[k]; });
+    entry.study = clampInt(studyInput.value, LIMITS.study, settings.study);   // minutes come from the (maybe unsaved) inputs
+    entry.pit = clampInt(pitInput.value, LIMITS.pit, settings.pit);
+    var at = -1;                                  // same name (case-insensitive) = overwrite
+    presets.forEach(function(p, i){ if(p.name.toLowerCase() === name.toLowerCase()) at = i; });
+    if(at >= 0){ presets[at] = entry; }
+    else if(presets.length >= MAX_PRESETS){ say(presetMsg, 'Max ' + MAX_PRESETS + ' presets — delete one first.', 'err'); return; }
+    else { presets.push(entry); }
+    savePresets(); renderPresets();
+    presetName.value = '';
+    say(presetMsg, (at >= 0 ? 'Updated "' : 'Saved "') + name + '".', 'ok');
+  });
+  presetName.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); presetSaveBtn.click(); } });
+
+  /* ---- backup: export / import everything as one JSON file ---- */
+  var importFile = $('importFile'), backupMsg = $('backupMsg');
+  var backupConfirm = $('backupConfirm'), backupConfirmText = $('backupConfirmText');
+  var pendingBackup = null;                       // a validated import waiting for the user's confirmation
+
+  $('exportBtn').addEventListener('click', function(){
+    if(statsDirty) saveStats();
+    var data = { app:'pitstop-timer', version:1, exportedAt:new Date().toISOString(),
+                 settings:settings, presets:presets, stats:stats };
+    var blob = new Blob([JSON.stringify(data, null, 2)], { type:'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'pitstop-backup-' + dayKey(new Date()) + '.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    say(backupMsg, 'Backup downloaded.', 'ok');
+  });
+  $('importBtn').addEventListener('click', function(){ importFile.value = ''; importFile.click(); });
+  importFile.addEventListener('change', function(){
+    var f = importFile.files && importFile.files[0];
+    if(!f) return;
+    if(f.size > 2*1024*1024){ say(backupMsg, 'File too large for a backup.', 'err'); return; }
+    var rd = new FileReader();
+    rd.onload = function(){
+      try{
+        var d = JSON.parse(rd.result);
+        if(!d || d.app !== 'pitstop-timer' || !d.settings || typeof d.settings !== 'object') throw new Error('bad');
+        pendingBackup = {
+          settings: sanitizeSettings(d.settings),
+          presets: sanitizePresets(d.presets),
+          stats: sanitizeStats(d.stats)
+        };
+        var nDays = Object.keys(pendingBackup.stats.days).length, nPresets = pendingBackup.presets.length;
+        backupConfirmText.textContent = 'Backup' + (d.exportedAt ? ' of ' + String(d.exportedAt).slice(0,10) : '') +
+          ': ' + nDays + ' day' + (nDays === 1 ? '' : 's') + ' of stats, ' + nPresets +
+          ' preset' + (nPresets === 1 ? '' : 's') + '. Replace ALL current data?';
+        backupConfirm.classList.add('open'); say(backupMsg, '');
+      }catch(e){
+        pendingBackup = null; backupConfirm.classList.remove('open');
+        say(backupMsg, 'Not a valid Pit Stop backup file.', 'err');
+      }
+    };
+    rd.onerror = function(){ say(backupMsg, 'Could not read the file.', 'err'); };
+    rd.readAsText(f);
+  });
+  $('backupNo').addEventListener('click', function(){ pendingBackup = null; backupConfirm.classList.remove('open'); });
+  $('backupYes').addEventListener('click', function(){
+    if(!pendingBackup) return;
+    var b = pendingBackup; pendingBackup = null;
+    backupConfirm.classList.remove('open');
+    applyDurations(b.settings.study, b.settings.pit);   // keeps the running phase's elapsed time
+    Object.keys(b.settings).forEach(function(k){ settings[k] = b.settings[k]; });
+    presets = b.presets; stats = b.stats;
+    saveSettings(); savePresets(); saveStats();
+    customPicked = settings.longEvery > 0;
+    longLastEvery = settings.longEvery > 0 ? settings.longEvery : LONG_EVERY_DEFAULT;
+    volSlider.value = settings.volume;
+    goalInput.value = settings.lapGoal;
+    refreshSettingsUI(); updateModeBtns(); buildSwatches(); renderPresets();
+    if(statsPanel.classList.contains('open')) updateStatsPanel();
+    render();
+    say(backupMsg, 'Backup restored.', 'ok');
+  });
+
+  /* =====================================================================
+     13. NOTICES, NOTIFICATIONS & MULTI-TAB GUARD
+     ===================================================================== */
+  /* Toast at the bottom of the track. Optional action button; `sticky` keeps it until dismissed.
+     Also exposed as window.pitstopNotice for the PWA's "new version" prompt. */
+  var noticeTimer = null;
+  function hideNotice(){ noticeEl.classList.remove('show'); clearTimeout(noticeTimer); }
+  function showNotice(text, actionLabel, action, sticky){
+    clearTimeout(noticeTimer);
+    noticeEl.textContent = '';
+    noticeEl.appendChild(make('span', '', text));
+    if(actionLabel){
+      var b = make('button', 'toggle-btn', actionLabel);
+      b.addEventListener('click', function(ev){ ev.stopPropagation(); hideNotice(); if(action) action(); });
+      noticeEl.appendChild(b);
+    }
+    noticeEl.onclick = hideNotice;
+    noticeEl.classList.add('show');
+    if(!sticky) noticeTimer = setTimeout(hideNotice, NOTICE_MS);
+  }
+  window.pitstopNotice = showNotice;
+
+  /* System notification — only when the user isn't looking at the widget
+     (tab hidden / window unfocused). Uses the service worker when there is one
+     (required on Android), plain Notification otherwise. */
+  function notify(title, body){
+    if(!settings.notifyOn || !('Notification' in window) || Notification.permission !== 'granted') return;
+    if(!document.hidden && document.hasFocus()) return;
+    var opts = { body: body, tag: 'pitstop-phase', icon: 'icon-192.png' };
+    try{
+      if(navigator.serviceWorker && navigator.serviceWorker.controller){
+        navigator.serviceWorker.ready.then(function(r){ r.showNotification(title, opts); }, function(){ new Notification(title, opts); });
+      } else { new Notification(title, opts); }
+    }catch(e){ try{ new Notification(title, opts); }catch(e2){} }
+  }
+  function notifyPhase(newPhase){
+    if(newPhase === 'study'){
+      notify('🏁 Back on track — ' + settings.studyName, 'Time to study: ' + settings.study + ' min.');
+    } else {
+      notify((state.longBreak ? '☕ Long break — ' : '🛞 Pit stop — ') + settings.pitName, 'Take a break: ' + fmtMin(state.durationSec) + ' min.');
+    }
+  }
+  function notifyGoal(){
+    notify('🏁 Target reached', state.lap + ' / ' + settings.lapGoal + ' laps done. Continue or reset?');
+  }
+
+  /* Only one tab runs the timer: starting it in one tab pauses the others.
+     Stats and presets changed in another tab are picked up here. */
+  var TAB_ID = Math.random().toString(36).slice(2);
+  function announceRunning(){
+    try{ localStorage.setItem(STORAGE.active, TAB_ID + ':' + Date.now()); }catch(e){}
+  }
+  window.addEventListener('storage', function(e){
+    if(e.key === STORAGE.active && e.newValue && e.newValue.indexOf(TAB_ID + ':') !== 0){
+      if(state.running){
+        state.running = false;
+        render();
+        showNotice('Paused: the timer was started in another tab.');
+      }
+    } else if(e.key === STORAGE.stats){
+      if(!statsDirty){ stats = loadStats(); if(statsPanel.classList.contains('open')) updateStatsPanel(); }
+    } else if(e.key === STORAGE.presets){
+      presets = readStored(STORAGE.presets, sanitizePresets, function(){ return []; });
+      renderPresets();
+    }
+  });
+
+  /* =====================================================================
+     14. KEYBOARD & ACCESSIBILITY
+     ===================================================================== */
+  /* Shortcuts: Space play/pause · R reset · S or → skip · M sound · G or , settings · T stats · Esc closes the cheat sheet.
+     Ignored while typing and with modifier keys (so Ctrl+R still reloads).
+     Each key just clicks the matching button, so it behaves exactly like the mouse. */
+  document.addEventListener('keydown', function(e){
+    if(e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
+    if(!settings.shortcutsOn) return;
+    var t = e.target;
+    if(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+    if(e.key === 'Escape' && shortcutsOverlay.classList.contains('open')){ setShortcutsInfo(false); return; }
+    if(!playBtn.offsetParent) return;             // widget closed
+    var btn = null;
+    switch(e.key){
+      case ' ':
+        // a focused <button> already turns Space into a click natively
+        if(t && (t.tagName === 'BUTTON' || (t.getAttribute && t.getAttribute('role') === 'button'))) return;
+        btn = playBtn; break;
+      case 'r': case 'R': btn = resetBtn; break;
+      case 's': case 'S': case 'ArrowRight': btn = skipBtn; break;
+      case 'm': case 'M': btn = soundBtn; break;
+      case 'g': case 'G': case ',': btn = gearBtn; break;
+      case 't': case 'T': btn = statsBtn; break;
+    }
+    if(!btn) return;
+    e.preventDefault();
+    btn.click();
+  });
+
+  /* The icon "buttons", swatches and the phase label are divs: give them a
+     button role, a name and keyboard activation. State (on/off, selected,
+     expanded) is mirrored into ARIA attributes. */
+  var ARIA_TOGGLES = ['soundBtn','notifyBtn','bgBtn','shortcutsBtn','wakeBtn','longBtn'];
+  var INPUT_LABELS = { studyInput:'Study minutes', pitInput:'Stop minutes', goalInput:'Lap goal (0 = off)', presetName:'Preset name' };
+  function syncAria(){
+    var widgetEl = $('widget');
+    var fake = widgetEl.querySelectorAll('.iconbtn, .swatch, #phaseLabel');
+    for(var i=0;i<fake.length;i++){
+      var node = fake[i];
+      if(!node.hasAttribute('role')) node.setAttribute('role','button');
+      if(!node.hasAttribute('tabindex')) node.setAttribute('tabindex','0');
+      var name = node.classList.contains('swatch') ? ('Color ' + (node.title || node.dataset.color || '')) :
+                 (node.id === 'phaseLabel' ? 'Rename this phase (' + node.textContent + ')' : node.title);
+      if(name) node.setAttribute('aria-label', name);
+      if(node.classList.contains('swatch')) node.setAttribute('aria-pressed', node.classList.contains('active') ? 'true' : 'false');
+    }
+    ARIA_TOGGLES.forEach(function(id){ $(id).setAttribute('aria-pressed', $(id).textContent === 'ON' ? 'true' : 'false'); });
+    var choices = widgetEl.querySelectorAll('.mode-btn, .part-tab');
+    for(var j=0;j<choices.length;j++) choices[j].setAttribute('aria-pressed', choices[j].classList.contains('active') ? 'true' : 'false');
+    gearBtn.setAttribute('aria-expanded', settingsPanel.classList.contains('open') ? 'true' : 'false');
+    statsBtn.setAttribute('aria-expanded', statsPanel.classList.contains('open') ? 'true' : 'false');
+    Object.keys(INPUT_LABELS).forEach(function(id){
+      if(!$(id).hasAttribute('aria-label')) $(id).setAttribute('aria-label', INPUT_LABELS[id]);
+    });
+  }
+  var ariaQueued = false;
+  function queueAria(){                           // coalesce bursts of DOM changes into one pass per frame
+    if(ariaQueued) return;
+    ariaQueued = true;
+    requestAnimationFrame(function(){ ariaQueued = false; syncAria(); });
+  }
+  new MutationObserver(function(recs){
+    for(var i=0;i<recs.length;i++){
+      var t = recs[i].target, id = t && (t.id || (t.parentNode && t.parentNode.id));
+      if(id === 'timeLabel' || id === 'lapLabel' || id === 'srStatus' || id === 'notice') continue;   // changes every second: not worth a pass
+      queueAria(); return;
+    }
+  }).observe($('widget'), { subtree:true, childList:true, attributes:true, attributeFilter:['class'] });
+  document.addEventListener('keydown', function(e){          // Enter / Space activate the div "buttons"
+    if(e.key !== 'Enter' && e.key !== ' ') return;
+    var t = e.target;
+    if(!t || t.getAttribute('role') !== 'button' || t.tagName === 'BUTTON' || t.isContentEditable) return;
+    e.preventDefault();
+    t.click();
+  });
+
+  /* =====================================================================
+     15. START-UP
+     ===================================================================== */
+  studyInput.value = settings.study;
+  pitInput.value = settings.pit;
+  goalInput.value = settings.lapGoal;
+  volSlider.value = settings.volume;
+  layout();
+  requestAnimationFrame(layout);                  // once more after first paint, in case fonts/images shifted sizes
+  applyDaylight();
+  buildSwatches();
+  refreshSettingsUI();
+  updateModeBtns();
+  renderPresets();
+  render();
+  syncProgressRing();
+  syncAria();
+
+  requestAnimationFrame(tick);
+  // Hidden tabs get no animation frames: keep the clock (and phase changes /
+  // notifications) running with a ~1 s timer, and resync on return.
+  setInterval(function(){ if(document.hidden) update(); }, 1000);
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) update(); });
+
+  try{                                            // first visit only: one short hint
+    if(!localStorage.getItem(STORAGE.welcomed)){
+      safeSet(STORAGE.welcomed, '1');
+      setTimeout(function(){ showNotice('Press START to begin. Settings: gear (or G).'); }, 700);
+    }
+  }catch(e){}
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      reg.addEventListener('updatefound', function(){
+        var nw = reg.installing;
+        if(!nw) return;
+        nw.addEventListener('statechange', function(){
+          // a new version installed while an old one is in control -> offer a reload
+          if(nw.state === 'installed' && navigator.serviceWorker.controller && window.pitstopNotice){
+            window.pitstopNotice('New version available', 'RELOAD', function(){ location.reload(); }, true);
+          }
+        });
+      });
+    }).catch(function(){ /* offline support is optional */ });
+  });
+}
+</script>
+</body>
+</html>
