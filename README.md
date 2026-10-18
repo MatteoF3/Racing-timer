@@ -4,15 +4,6 @@ A pixel-art study timer with racing-style pacing: study laps, pit-stop breaks, d
 lap goals, long breaks, statistics and presets. Works offline and installs as an app (PWA).
 Everything stays in the browser (localStorage). No accounts, no analytics, no third-party requests.
 
-## Publish
-Upload this whole folder to any static HTTPS host (GitHub Pages, Netlify, Cloudflare Pages...).
-HTTPS (or `localhost`) is required for installation, notifications and keeping the screen awake.
-
-Try it locally: `python3 -m http.server 8000` in this folder, then open http://localhost:8000
-
-After changing any file, bump `CACHE_VERSION` in `sw.js` so installed copies update
-(users see a "New version available" prompt).
-
 ## Files
 - `index.html` the whole app (code + styles)
 - `sw.js` offline cache, `manifest.webmanifest` install info, `icons/` app icons
